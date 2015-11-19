@@ -17,16 +17,18 @@
  *   You should have received a copy of the GNU General Public License
  *   along with Nextflow.  If not, see <http://www.gnu.org/licenses/>.
  */
+apply plugin: 'groovy'
 
-include 'my-capsule'
-include 'nxf-commons'
-include 'nxf-dnanexus'
-include 'nxf-extrae'
-include 'nxf-console'
-include 'nxf-drmaa'
-include 'nxf-ignite'
-include 'nxf-webui'
-
-rootProject.children.each { prj ->
-    prj.projectDir = new File("$rootDir/subprojects/$prj.name")
+sourceSets {
+    main.java.srcDirs = []
+    main.groovy.srcDirs = ['src/main']
+    main.resources.srcDirs = ['src/resources']
+    test.groovy.srcDirs = ['src/test']
+    test.java.srcDirs = []
+    test.resources.srcDirs = []
 }
+
+dependencies {
+    compile project(':')
+}
+

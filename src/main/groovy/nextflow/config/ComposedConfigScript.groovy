@@ -109,4 +109,18 @@ abstract class ComposedConfigScript extends Script {
         this.configStack.pop()
     }
 
+    /**
+     * Create an workflow input field
+     */
+    def field( value ) {
+        new InputField((Object)value)
+    }
+
+    def field( Map opts, value ) {
+        new InputField(opts,value)
+    }
+
+    def field( Map opts ) {
+        new InputField(opts)
+    }
 }

@@ -402,4 +402,25 @@ class ComposedConfigSlurperTest extends Specification {
         thrown(NoSuchFileException)
 
     }
+
+    def 'should create a form field parameters' () {
+
+        given:
+        def text = '''
+        params {
+          alpha = 'one'
+          beta = field 'two', type: 'file'
+          gamma = field type: 'text', label: 'Gamma value'
+          delta = field 'hello'
+        }
+        '''
+
+        when:
+        def config = new ComposedConfigSlurper().parse(text)
+        then:
+        config.params.alpha == 'one'
+        config.params.beta == new InputField('two', type: 'file')
+        config.params.gamma == new InputField(type: 'text', label: 'Gamma value')
+        config.params.delta == new InputField('hello')
+    }
 }
