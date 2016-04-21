@@ -35,9 +35,7 @@ import nextflow.util.PathTrie
  */
 class KubernetesExecutor extends AbstractGridExecutor {
 
-    static private volumes = new AtomicInteger()
-
-    static final public String CMD_KUBE = '.command.yaml'
+    static final public String CMD_KUBE = '.command.kube'
 
     final protected BashWrapperBuilder createBashWrapperBuilder(TaskRun task) {
         // creates the wrapper script
@@ -56,11 +54,21 @@ class KubernetesExecutor extends AbstractGridExecutor {
         throw new UnsupportedOperationException()
     }
 
+    /**
+     * @param task A {@link TaskRun} instance that need to be submited for execution
+     * @param scriptFile (not used)
+     * @return the command line to submit the task execution
+     */
     @Override
     List<String> getSubmitCommandLine(TaskRun task, Path scriptFile) {
         return ['kubectl', 'create', '-f', CMD_KUBE, '-o', 'name']
     }
 
+    /**
+     * Parse the output of a `kubectl create <job>` to find out the job ID
+     * @param text The `kubectl` standard output
+     * @return The newly submit job ID
+     */
     @Override
     def parseJobId(String text) {
         if( text.startsWith('job/') ) {
@@ -70,8 +78,8 @@ class KubernetesExecutor extends AbstractGridExecutor {
     }
 
     @Override
-    protected String getKillCommand() {
-        'kubectl'
+    protected List<String> getKillCommand() {
+        ['kubectl', 'delete', 'job']
     }
 
     @Override
@@ -79,46 +87,40 @@ class KubernetesExecutor extends AbstractGridExecutor {
         ['kubectl', 'get', 'pods', '-a']
     }
 
-    static protected Map DECODE_STATUS = [
-            'U': QueueStatus.PENDING,   // Unexpanded
-            'I': QueueStatus.PENDING,   // Idle
-            'R': QueueStatus.RUNNING,   // Running
-            'X': QueueStatus.ERROR,     // Removed
-            'C': QueueStatus.DONE,      // Completed
-            'H': QueueStatus.HOLD,      // Held
-            'E': QueueStatus.ERROR      // Error
+    static private Map DECODE_STATUS = [
+            'Pending': QueueStatus.PENDING,   // Unexpanded
+            'Running': QueueStatus.RUNNING,   // Running
+            'Completed': QueueStatus.DONE     // Completed
     ]
 
+    static private final KUBE_JOB_ID = ~/^(nxf-[0-9a-f]{32})-[0-9a-z]+/
 
     @Override
     protected Map<?, QueueStatus> parseQueueStatus(String text) {
         def result = [:]
         if( !text ) return result
 
-        boolean started = false
-        def itr = text.readLines().iterator()
-        while( itr.hasNext() ) {
-            String line = itr.next()
-            if( !started ) {
-                started = line.startsWith(' ID ')
-                continue
+        text.readLines().each { line ->
+            def items = line.tokenize()
+            def regex = KUBE_JOB_ID.matcher(items[0])
+            if( regex.matches() ) {
+                def id = regex.group(1)
+                def status = items[2]
+                result[id] = DECODE_STATUS[ status ]
             }
-
-            if( !line.trim() ) {
-                break
-            }
-
-            def cols = line.tokenize(' ')
-            def id = cols[0]
-            def st = cols[5]
-            result[id] = DECODE_STATUS[st]
         }
 
         return result
     }
 
 
+    /**
+     * Extends {@link BashWrapperBuilder} to handle Kubernetes
+     * job descripton YAML file
+     */
     static class KubernetesWrapperBuilder extends BashWrapperBuilder {
+
+        static private volumes = new AtomicInteger()
 
         private String taskHash
         private cpu
@@ -131,6 +133,10 @@ class KubernetesExecutor extends AbstractGridExecutor {
             mem = task.config.getMemory()
         }
 
+        /**
+         * Creates the job BASH wrapper file and the Kubernetes YAML descriptor
+         * @return The {@link Path} to the BASH wrapper file
+         */
         Path build() {
             final wrapper = super.build()
             // save the condor manifest
@@ -139,7 +145,10 @@ class KubernetesExecutor extends AbstractGridExecutor {
             return wrapper
         }
 
-        String makeYaml() {
+        /**
+         * @return The Kubernetes job descriptor YAML string
+         */
+        private String makeYaml() {
 
             // get input files paths
             def paths = DockerBuilder.inputFilesToPaths(inputFiles)
@@ -163,13 +172,15 @@ class KubernetesExecutor extends AbstractGridExecutor {
                     workDir: workDir.toString(),
                     mounts: mounts,
                     cpu: cpu,
-                    mem: mem  )
+                    mem: mem )
                     .create()
         }
 
     }
 
-
+    /**
+     * Kubernetes job YAML descriptor build helper
+     */
     static class YamlBuilder {
 
         String name

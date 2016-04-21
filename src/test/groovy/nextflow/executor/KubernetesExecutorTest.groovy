@@ -15,6 +15,28 @@ import spock.lang.Specification
  */
 class KubernetesExecutorTest extends Specification {
 
+    def 'should return the kill command' () {
+
+        given:
+        def executor = [:] as KubernetesExecutor
+
+        expect:
+        executor.getKillCommand() == ['kubectl', 'delete', 'job']
+        executor.killTaskCommand('nxf-abc') == ['kubectl', 'delete', 'job', 'nxf-abc']
+        executor.killTaskCommand(['nxf-123', 'nxf-xyz', 'nxf-7ad']) == ['kubectl', 'delete', 'job', 'nxf-123', 'nxf-xyz', 'nxf-7ad']
+    }
+
+    def 'should return the status command'() {
+
+        setup:
+        def executor = [:] as KubernetesExecutor
+
+        expect:
+        executor.queueStatusCommand(null) == ['kubectl', 'get', 'pods', '-a']
+        executor.queueStatusCommand('long') == ['kubectl', 'get', 'pods', '-a']
+
+    }
+
     def 'should create the kubernetes yaml job descriptor' () {
 
         given:
@@ -36,8 +58,8 @@ class KubernetesExecutorTest extends Specification {
 
         then:
         folder.resolve('.command.run').exists()
-        folder.resolve('.command.yaml').exists()
-        folder.resolve('.command.yaml').text == """
+        folder.resolve('.command.kube').exists()
+        folder.resolve('.command.kube').text == """
                     apiVersion: batch/v1
                     kind: Job
                     metadata:
@@ -269,6 +291,35 @@ class KubernetesExecutorTest extends Specification {
                 '''
                 .stripIndent().leftTrim()
 
+
+    }
+
+
+
+    def 'should parse queue output' () {
+
+        given:
+        def text = '''
+        NAME                                         READY     STATUS             RESTARTS   AGE
+        hello-2414436058-mh5nl                       0/1       CrashLoopBackOff   1          13s
+        k8s-etcd-127.0.0.1                           1/1       Running            0          16h
+        k8s-master-127.0.0.1                         4/4       Running            0          16h
+        k8s-proxy-127.0.0.1                          1/1       Running            0          16h
+        nxf-074dafc20052cec9cbca352df3032ba7-l2c2x   0/1       Pending            0          16h
+        nxf-0e38534bbd7efdb27d301b03528f1de6-5b9js   0/1       Running            0          14h
+        nxf-15083267fa92ca622458d282bf37be08-pv5yz   0/1       Completed          0          16h
+        '''
+                .stripIndent().leftTrim()
+
+        when:
+        def executor = [:] as KubernetesExecutor
+        def status = executor.parseQueueStatus(text)
+
+        then:
+        status['nxf-074dafc20052cec9cbca352df3032ba7'] == AbstractGridExecutor.QueueStatus.PENDING
+        status['nxf-0e38534bbd7efdb27d301b03528f1de6'] == AbstractGridExecutor.QueueStatus.RUNNING
+        status['nxf-15083267fa92ca622458d282bf37be08'] == AbstractGridExecutor.QueueStatus.DONE
+        status.size() == 3
 
     }
 }

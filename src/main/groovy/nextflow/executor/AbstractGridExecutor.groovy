@@ -179,7 +179,7 @@ abstract class AbstractGridExecutor extends Executor {
      * @return The command line to be used to kill the specified job
      */
     protected List<String> killTaskCommand(def jobId) {
-        final result = [ getKillCommand() ]
+        final result = getKillCommand()
         if( jobId instanceof Collection ) {
             jobId.each { result.add(it.toString()) }
             log.trace "Kill command: ${result}"
@@ -190,7 +190,7 @@ abstract class AbstractGridExecutor extends Executor {
         return result
     }
 
-    protected abstract String getKillCommand()
+    protected abstract List<String> getKillCommand()
 
     /**
      * Status as returned by the grid engine

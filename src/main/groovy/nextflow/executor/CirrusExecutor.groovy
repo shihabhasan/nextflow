@@ -160,7 +160,7 @@ class CirrusExecutor extends AbstractGridExecutor {
     }
 
     @Override
-    protected String getKillCommand() { 'kancel' }
+    protected List<String> getKillCommand() { ['kancel'] }
 
     @Override
     protected List<String> queueStatusCommand( queue ) {
