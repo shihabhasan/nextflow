@@ -23,6 +23,7 @@ import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 
 import nextflow.container.DockerBuilder
+import nextflow.exception.AbortOperationException
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
 import nextflow.util.PathTrie
@@ -38,6 +39,11 @@ class KubernetesExecutor extends AbstractGridExecutor {
     static final public String CMD_KUBE = '.command.kube'
 
     final protected BashWrapperBuilder createBashWrapperBuilder(TaskRun task) {
+
+        if( !task.config.container ) {
+            throw new AbortOperationException("Missing container for process `${task.processor.name}`")
+        }
+
         // creates the wrapper script
         final builder = new KubernetesWrapperBuilder(task)
         return builder
