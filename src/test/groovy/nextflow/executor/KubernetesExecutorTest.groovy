@@ -21,9 +21,9 @@ class KubernetesExecutorTest extends Specification {
         def executor = [:] as KubernetesExecutor
 
         expect:
-        executor.getKillCommand() == ['kubectl', 'delete', 'job']
-        executor.killTaskCommand('nxf-abc') == ['kubectl', 'delete', 'job', 'nxf-abc']
-        executor.killTaskCommand(['nxf-123', 'nxf-xyz', 'nxf-7ad']) == ['kubectl', 'delete', 'job', 'nxf-123', 'nxf-xyz', 'nxf-7ad']
+        executor.getKillCommand() == ['kubectl', 'delete', 'pod']
+        executor.killTaskCommand('nxf-abc') == ['kubectl', 'delete', 'pod', 'nxf-abc']
+        executor.killTaskCommand(['nxf-123', 'nxf-xyz', 'nxf-7ad']) == ['kubectl', 'delete', 'pod', 'nxf-123', 'nxf-xyz', 'nxf-7ad']
     }
 
     def 'should return the status command'() {
@@ -60,35 +60,33 @@ class KubernetesExecutorTest extends Specification {
         folder.resolve('.command.run').exists()
         folder.resolve('.command.kube').exists()
         folder.resolve('.command.kube').text == """
-                    apiVersion: batch/v1
-                    kind: Job
+                    apiVersion: v1
+                    kind: Pod
                     metadata:
                       name: nxf-c023b9b90411d8ffcba8dd937c8a75d8
                       labels:
                         app: nextflow
                     spec:
-                      template:
-                        spec:
-                          restartPolicy: Never
-                          containers:
-                          - name: nxf-c023b9b90411d8ffcba8dd937c8a75d8
-                            image: ubuntu
-                            command: ["bash", ".command.run"]
-                            workingDir: $folder
-                            resources:
-                              limits:
-                                cpu: 8
-                                memory: 4096Mi
-                              requests:
-                                cpu: 8
-                                memory: 4096Mi
-                            volumeMounts:
-                            - mountPath: $folder
-                              name: vol-1
-                          volumes:
-                          - name: vol-1
-                            hostPath:
-                              path: $folder
+                      restartPolicy: Never
+                      containers:
+                      - name: nxf-c023b9b90411d8ffcba8dd937c8a75d8
+                        image: ubuntu
+                        command: ["bash", ".command.run"]
+                        workingDir: $folder
+                        resources:
+                          limits:
+                            cpu: 8
+                            memory: 4096Mi
+                          requests:
+                            cpu: 8
+                            memory: 4096Mi
+                        volumeMounts:
+                        - mountPath: $folder
+                          name: vol-1
+                      volumes:
+                      - name: vol-1
+                        hostPath:
+                          path: $folder
                     """
 
                     .stripIndent().leftTrim()
@@ -104,21 +102,19 @@ class KubernetesExecutorTest extends Specification {
         def yaml = builder.create()
         then:
         yaml == '''
-                apiVersion: batch/v1
-                kind: Job
+                apiVersion: v1
+                kind: Pod
                 metadata:
                   name: basic
                   labels:
                     app: nextflow
                 spec:
-                  template:
-                    spec:
-                      restartPolicy: Never
-                      containers:
-                      - name: basic
-                        image: ubuntu
-                        command: ["do", "this", "and", "that"]
-                        workingDir: /work/path
+                  restartPolicy: Never
+                  containers:
+                  - name: basic
+                    image: ubuntu
+                    command: ["do", "this", "and", "that"]
+                    workingDir: /work/path
                 '''
                 .stripIndent().leftTrim()
 
@@ -127,28 +123,26 @@ class KubernetesExecutorTest extends Specification {
         yaml = builder.create()
         then:
         yaml == '''
-                apiVersion: batch/v1
-                kind: Job
+                apiVersion: v1
+                kind: Pod
                 metadata:
                   name: hello
                   labels:
                     app: nextflow
                 spec:
-                  template:
-                    spec:
-                      restartPolicy: Never
-                      containers:
-                      - name: hello
-                        image: busybox
-                        command: ["touch", "Hello"]
-                        workingDir: /home/work/dir1
-                        volumeMounts:
-                        - mountPath: /home/data/work
-                          name: vol1
-                      volumes:
-                      - name: vol1
-                        hostPath:
-                          path: /home/data/work
+                  restartPolicy: Never
+                  containers:
+                  - name: hello
+                    image: busybox
+                    command: ["touch", "Hello"]
+                    workingDir: /home/work/dir1
+                    volumeMounts:
+                    - mountPath: /home/data/work
+                      name: vol1
+                  volumes:
+                  - name: vol1
+                    hostPath:
+                      path: /home/data/work
                 '''
                 .stripIndent().leftTrim()
 
@@ -158,38 +152,36 @@ class KubernetesExecutorTest extends Specification {
         yaml = builder.create()
         then:
         yaml == '''
-                apiVersion: batch/v1
-                kind: Job
+                apiVersion: v1
+                kind: Pod
                 metadata:
                   name: Test
                   labels:
                     app: nextflow
                 spec:
-                  template:
-                    spec:
-                      restartPolicy: Never
-                      containers:
-                      - name: Test
-                        image: busybox
-                        command: ["touch", "Hello"]
-                        workingDir: /work/here
-                        volumeMounts:
-                        - mountPath: /path1
-                          name: vol1
-                        - mountPath: /path2
-                          name: vol2
-                        - mountPath: /path3
-                          name: vol3
-                      volumes:
-                      - name: vol1
-                        hostPath:
-                          path: /path1
-                      - name: vol2
-                        hostPath:
-                          path: /path2
-                      - name: vol3
-                        hostPath:
-                          path: /path3
+                  restartPolicy: Never
+                  containers:
+                  - name: Test
+                    image: busybox
+                    command: ["touch", "Hello"]
+                    workingDir: /work/here
+                    volumeMounts:
+                    - mountPath: /path1
+                      name: vol1
+                    - mountPath: /path2
+                      name: vol2
+                    - mountPath: /path3
+                      name: vol3
+                  volumes:
+                  - name: vol1
+                    hostPath:
+                      path: /path1
+                  - name: vol2
+                    hostPath:
+                      path: /path2
+                  - name: vol3
+                    hostPath:
+                      path: /path3
                 '''
                 .stripIndent().leftTrim()
 
@@ -203,26 +195,24 @@ class KubernetesExecutorTest extends Specification {
         def yaml = builder.create()
         then:
         yaml == '''
-                apiVersion: batch/v1
-                kind: Job
+                apiVersion: v1
+                kind: Pod
                 metadata:
                   name: busybox
                   labels:
                     app: nextflow
                 spec:
-                  template:
-                    spec:
-                      restartPolicy: Never
-                      containers:
-                      - name: busybox
-                        image: debian
-                        command: ["holy", "command"]
-                        workingDir: /work/path
-                        resources:
-                          limits:
-                            cpu: 4
-                          requests:
-                            cpu: 4
+                  restartPolicy: Never
+                  containers:
+                  - name: busybox
+                    image: debian
+                    command: ["holy", "command"]
+                    workingDir: /work/path
+                    resources:
+                      limits:
+                        cpu: 4
+                      requests:
+                        cpu: 4
                 '''
                 .stripIndent().leftTrim()
 
@@ -231,26 +221,24 @@ class KubernetesExecutorTest extends Specification {
         yaml = builder.create()
         then:
         yaml == '''
-                apiVersion: batch/v1
-                kind: Job
+                apiVersion: v1
+                kind: Pod
                 metadata:
                   name: busybox
                   labels:
                     app: nextflow
                 spec:
-                  template:
-                    spec:
-                      restartPolicy: Never
-                      containers:
-                      - name: busybox
-                        image: debian
-                        command: ["holy", "command"]
-                        workingDir: /work/path
-                        resources:
-                          limits:
-                            memory: 1024Mi
-                          requests:
-                            memory: 1024Mi
+                  restartPolicy: Never
+                  containers:
+                  - name: busybox
+                    image: debian
+                    command: ["holy", "command"]
+                    workingDir: /work/path
+                    resources:
+                      limits:
+                        memory: 1024Mi
+                      requests:
+                        memory: 1024Mi
                 '''
                 .stripIndent().leftTrim()
 
@@ -259,35 +247,33 @@ class KubernetesExecutorTest extends Specification {
         yaml = builder.create()
         then:
         yaml == '''
-                apiVersion: batch/v1
-                kind: Job
+                apiVersion: v1
+                kind: Pod
                 metadata:
                   name: busybox
                   labels:
                     app: nextflow
                 spec:
-                  template:
-                    spec:
-                      restartPolicy: Never
-                      containers:
-                      - name: busybox
-                        image: debian
-                        command: ["holy", "command"]
-                        workingDir: /work/path
-                        resources:
-                          limits:
-                            cpu: 2
-                            memory: 3072Mi
-                          requests:
-                            cpu: 2
-                            memory: 3072Mi
-                        volumeMounts:
-                        - mountPath: /path1
-                          name: vol1
-                      volumes:
-                      - name: vol1
-                        hostPath:
-                          path: /path1
+                  restartPolicy: Never
+                  containers:
+                  - name: busybox
+                    image: debian
+                    command: ["holy", "command"]
+                    workingDir: /work/path
+                    resources:
+                      limits:
+                        cpu: 2
+                        memory: 3072Mi
+                      requests:
+                        cpu: 2
+                        memory: 3072Mi
+                    volumeMounts:
+                    - mountPath: /path1
+                      name: vol1
+                  volumes:
+                  - name: vol1
+                    hostPath:
+                      path: /path1
                 '''
                 .stripIndent().leftTrim()
 
@@ -305,9 +291,10 @@ class KubernetesExecutorTest extends Specification {
         k8s-etcd-127.0.0.1                           1/1       Running            0          16h
         k8s-master-127.0.0.1                         4/4       Running            0          16h
         k8s-proxy-127.0.0.1                          1/1       Running            0          16h
-        nxf-074dafc20052cec9cbca352df3032ba7-l2c2x   0/1       Pending            0          16h
-        nxf-0e38534bbd7efdb27d301b03528f1de6-5b9js   0/1       Running            0          14h
-        nxf-15083267fa92ca622458d282bf37be08-pv5yz   0/1       Completed          0          16h
+        nxf-074dafc20052cec9cbca352df3032ba7         0/1       Pending            0          16h
+        nxf-0e38534bbd7efdb27d301b03528f1de6         0/1       Running            0          14h
+        nxf-15083267fa92ca622458d282bf37be08         0/1       Completed          0          16h
+        nxf-dac99ec6a954b6399c1144cfde833c3c         0/1       Error              0          16h
         '''
                 .stripIndent().leftTrim()
 
@@ -319,7 +306,8 @@ class KubernetesExecutorTest extends Specification {
         status['nxf-074dafc20052cec9cbca352df3032ba7'] == AbstractGridExecutor.QueueStatus.PENDING
         status['nxf-0e38534bbd7efdb27d301b03528f1de6'] == AbstractGridExecutor.QueueStatus.RUNNING
         status['nxf-15083267fa92ca622458d282bf37be08'] == AbstractGridExecutor.QueueStatus.DONE
-        status.size() == 3
+        status['nxf-dac99ec6a954b6399c1144cfde833c3c'] == AbstractGridExecutor.QueueStatus.ERROR
+        status.size() == 4
 
     }
 }

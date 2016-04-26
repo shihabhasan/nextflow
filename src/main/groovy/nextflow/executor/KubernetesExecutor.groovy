@@ -77,7 +77,7 @@ class KubernetesExecutor extends AbstractGridExecutor {
      */
     @Override
     def parseJobId(String text) {
-        if( text.startsWith('job/') ) {
+        if( text.startsWith('pod/') ) {
             return text.substring(4)
         }
         throw new IllegalStateException("Not a valid Kubernates job id: `$text`")
@@ -85,7 +85,7 @@ class KubernetesExecutor extends AbstractGridExecutor {
 
     @Override
     protected List<String> getKillCommand() {
-        ['kubectl', 'delete', 'job']
+        ['kubectl', 'delete', 'pod']
     }
 
     @Override
@@ -94,12 +94,13 @@ class KubernetesExecutor extends AbstractGridExecutor {
     }
 
     static private Map DECODE_STATUS = [
-            'Pending': QueueStatus.PENDING,   // Unexpanded
-            'Running': QueueStatus.RUNNING,   // Running
-            'Completed': QueueStatus.DONE     // Completed
+            'Pending': QueueStatus.PENDING,
+            'Running': QueueStatus.RUNNING,
+            'Error': QueueStatus.ERROR,
+            'Completed': QueueStatus.DONE
     ]
 
-    static private final KUBE_JOB_ID = ~/^(nxf-[0-9a-f]{32})-[0-9a-z]+/
+    static private final KUBE_JOB_ID = ~/^(nxf-[0-9a-f]{32})/
 
     @Override
     protected Map<?, QueueStatus> parseQueueStatus(String text) {
@@ -200,21 +201,19 @@ class KubernetesExecutor extends AbstractGridExecutor {
         String create() {
 
 """\
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: Pod
 metadata:
   name: $name
   labels:
     app: nextflow
 spec:
-  template:
-    spec:
-      restartPolicy: Never
-      containers:
-      - name: $name
-        image: $image
-        command: ${cmd.collect { "\"$it\"" }}
-        workingDir: $workDir
+  restartPolicy: Never
+  containers:
+  - name: $name
+    image: $image
+    command: ${cmd.collect { "\"$it\"" }}
+    workingDir: $workDir
 ${getResources0()}${getMounts0(mounts)}${getVolumes0(mounts)}\
 """
 
@@ -229,14 +228,14 @@ ${getResources0()}${getMounts0(mounts)}${getVolumes0(mounts)}\
 
             if( !vols ) return ''
 
-            def result = new StringBuilder('        volumeMounts:\n')
+            def result = new StringBuilder('    volumeMounts:\n')
 
             vols.each { String name, String path ->
 
                 result.append(
 """\
-        - mountPath: $path
-          name: $name
+    - mountPath: $path
+      name: $name
 """
                 )
             }
@@ -253,15 +252,15 @@ ${getResources0()}${getMounts0(mounts)}${getVolumes0(mounts)}\
 
             if( !vols ) return ''
 
-            def result = new StringBuilder('      volumes:\n')
+            def result = new StringBuilder('  volumes:\n')
 
             vols.each { String name, String path ->
 
                 result.append(
 """\
-      - name: $name
-        hostPath:
-          path: $path
+  - name: $name
+    hostPath:
+      path: $path
 """
                 )
 
@@ -275,13 +274,13 @@ ${getResources0()}${getMounts0(mounts)}${getVolumes0(mounts)}\
 
             if( cpu>1 || mem ) {
                 def res = ''
-                if( cpu>1 ) res += "            cpu: ${cpu}\n"
-                if( mem ) res += "            memory: ${mem.toMega()}Mi\n"
+                if( cpu>1 ) res += "        cpu: ${cpu}\n"
+                if( mem ) res += "        memory: ${mem.toMega()}Mi\n"
 
-                def result = new StringBuilder('        resources:\n')
-                result.append('          limits:\n')
+                def result = new StringBuilder('    resources:\n')
+                result.append('      limits:\n')
                 result.append(res)
-                result.append('          requests:\n')
+                result.append('      requests:\n')
                 result.append(res)
                 return result.toString()
             }
