@@ -52,6 +52,7 @@ import nextflow.exception.MissingValueException
 import nextflow.exception.ProcessException
 import nextflow.exception.ProcessFailedException
 import nextflow.exception.ProcessNotRecoverableException
+import nextflow.executor.CachedTaskHandler
 import nextflow.executor.Executor
 import nextflow.file.FileHelper
 import nextflow.file.FileHolder
@@ -813,11 +814,16 @@ class TaskProcessor {
         }
 
         /*
+         * load the task record in the cache DB
+         */
+        final entry = session.getCachedTask(task.processor, hash)
+
+        /*
          * verify cached context map
          */
         TaskContext ctx = null
         def ctxFile = folder.resolve(TaskRun.CMD_CONTEXT)
-        if( task.hasCacheableValues() ) {
+        if( !entry && task.hasCacheableValues() ) {
             try {
                 ctx = TaskContext.read(this, ctxFile)
             }
@@ -851,6 +857,9 @@ class TaskProcessor {
             }
 
             log.info "[${task.hashLog}] Cached process > ${task.name}"
+            // -- notify cached event
+            if( entry )
+                session.dispatcher.notifyCached(new CachedTaskHandler(task,entry.trace))
 
             // -- now bind the results
             finalizeTask0(task)
@@ -1877,14 +1886,6 @@ class TaskProcessor {
 
             // -- if it's OK collect results and finalize
             collectOutputs(task)
-
-            // save the context map for caching purpose
-            // only the 'cache' is active and
-            if( isCacheable() && task.hasCacheableValues() && task.context != null ) {
-                def target = task.workDir.resolve(TaskRun.CMD_CONTEXT)
-                task.context.save(target)
-            }
-
         }
         catch ( Throwable error ) {
             fault = resumeOrDie(task, error)
@@ -1900,11 +1901,11 @@ class TaskProcessor {
     /**
      * Whenever the process can be cached
      */
-    protected boolean isCacheable() {
+    boolean isCacheable() {
         session.cacheable && config.cacheable
     }
 
-    protected boolean isResumable() {
+    @PackageScope boolean isResumable() {
         isCacheable() && session.resumeMode
     }
 

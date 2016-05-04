@@ -27,6 +27,7 @@ import groovy.transform.Memoized
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.util.Duration
+import nextflow.util.KryoHelper
 import nextflow.util.MemoryUnit
 /**
   * This object represent holds the information of a single process run,
@@ -36,7 +37,15 @@ import nextflow.util.MemoryUnit
   */
 @Slf4j
 @CompileStatic
-class TraceRecord {
+class TraceRecord implements Serializable {
+
+    public TraceRecord() {
+        this.store = [:]
+    }
+
+    private TraceRecord(Map store) {
+        this.store = store
+    }
 
     final private static String DEFAULT_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS"
 
@@ -75,7 +84,7 @@ class TraceRecord {
             attempt:    'num'
     ]
 
-    static Map<String,Closure<String>> FORMATTER = [
+    static public Map<String,Closure<String>> FORMATTER = [
             str: this.&fmtString,
             num: this.&fmtNumber,
             date: this.&fmtDate,
@@ -224,7 +233,7 @@ class TraceRecord {
 
 
     @PackageScope
-    Map<String,Object> store = [:]
+    Map<String,Object> store
 
     @Memoized
     def Set<String> keySet() {
@@ -420,6 +429,15 @@ class TraceRecord {
     @Override
     int hashCode() {
         store.hashCode()
+    }
+
+    byte[] serialize() {
+        KryoHelper.serialize(store)
+    }
+
+    static TraceRecord deserialize(byte[] buffer) {
+        Map map = (Map)KryoHelper.deserialize(buffer)
+        new TraceRecord(map)
     }
 
 }

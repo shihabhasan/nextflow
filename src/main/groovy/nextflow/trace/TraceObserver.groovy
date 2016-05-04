@@ -65,5 +65,13 @@ interface TraceObserver {
      */
     void onProcessComplete(TaskHandler handler)
 
+    /**
+     * This method is when a process run raises an error
+     * @param handler
+     * @param error
+     */
+    void onProcessError(TaskHandler handler, Throwable error)
+
+    void onProcessCached(TaskHandler handler)
 
 }

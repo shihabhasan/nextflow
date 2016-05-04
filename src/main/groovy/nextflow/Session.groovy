@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+import com.google.common.hash.HashCode
 import com.upplication.s3fs.S3OutputStream
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
@@ -42,7 +43,9 @@ import nextflow.file.FileHelper
 import nextflow.processor.ErrorStrategy
 import nextflow.trace.GraphObserver
 import nextflow.exception.MissingLibraryException
+import nextflow.processor.TaskContext
 import nextflow.processor.TaskDispatcher
+import nextflow.processor.TaskEntry
 import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
@@ -50,9 +53,14 @@ import nextflow.script.ScriptBinding
 import nextflow.trace.TimelineObserver
 import nextflow.trace.TraceFileObserver
 import nextflow.trace.TraceObserver
+import nextflow.trace.TraceRecord
 import nextflow.util.Barrier
 import nextflow.util.ConfigHelper
 import nextflow.util.Duration
+import nextflow.util.KryoHelper
+import org.iq80.leveldb.DB
+import org.iq80.leveldb.Options
+import org.iq80.leveldb.impl.Iq80DBFactory
 /**
  * Holds the information on the current execution
  *
@@ -113,6 +121,8 @@ class Session implements ISession {
     List<Path> libDir
 
     private Path binDir
+
+    private DB db
 
     /**
      * The unique identifier of this session
@@ -260,6 +270,8 @@ class Session implements ISession {
 
         this.observers = createObservers()
         this.statsEnabled = observers.size()>0
+
+        openDb()
     }
 
     /**
@@ -438,6 +450,9 @@ class Session implements ISession {
         execService.shutdown()
         execService = null
         log.trace "Session > executor shutdown"
+
+        // -- close db
+        closeDb()
 
         // -- shutdown s3 uploader
         shutdownS3Uploader()
@@ -648,6 +663,50 @@ class Session implements ISession {
         errorAction = action
     }
 
+    private void openDb() {
+        // create an unique DB path
+        def path = workDir.resolve('.db').resolve( uniqueId.toString() )
+        path.mkdirs()
+        // open a LevelDB instance
+        db = Iq80DBFactory.factory.open(path.resolve('db').toFile(), new Options().createIfMissing(true))
+    }
+
+    private void closeDb() {
+        db.close()
+    }
+
+
+    def TaskEntry getCachedTask(TaskProcessor processor, HashCode taskHash) {
+
+        def payload = db.get(taskHash.asBytes())
+        if( !payload )
+            return null
+
+        final entry = (List)KryoHelper.deserialize(payload)
+        TraceRecord trace = TraceRecord.deserialize( (byte[])entry[0] )
+        TaskContext ctx = entry[1]!=null ? TaskContext.deserialize(processor, (byte[])entry[1]) : null
+
+        return new TaskEntry(trace,ctx)
+    }
+
+    def cacheTask( TaskHandler handler ) {
+
+        final task = handler.task
+        final proc = task.processor
+        final key = task.hash.asBytes()
+
+        final trace = handler.getTraceRecord()
+        // save the context map for caching purpose
+        // only the 'cache' is active and
+        TaskContext ctx = proc.isCacheable() && task.hasCacheableValues() ? task.context : null
+
+        def entry = new ArrayList(2)
+        entry.add( trace.serialize() )
+        entry.add( ctx != null ? ctx.serialize() : null )
+
+        // -- save in the db
+        db.put( key, KryoHelper.serialize(entry) )
+    }
 
     @Memoized
     public getExecConfigProp( String execName, String name, Object defValue, Map env = null  ) {

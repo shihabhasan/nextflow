@@ -175,6 +175,7 @@ class TaskContext implements Map<String,Object>, Cloneable {
      *
      * @param contextFile The file where store the {@code DelegateMap} instance
      */
+    @Deprecated
     def void save( Path contextFile ) {
         try {
             def map = holder
@@ -189,6 +190,28 @@ class TaskContext implements Map<String,Object>, Cloneable {
             log.warn "Cannot serialize context map. Cause: ${e.cause} -- Resume will not work on this process"
             log.debug "Failed to serialize delegate map items: ${dumpMap(holder)}", e
         }
+    }
+
+    def byte[] serialize() {
+        try {
+            def map = holder
+            if( map.get(TaskProcessor.TASK_CONFIG) instanceof TaskConfig ) {
+                map = new LinkedHashMap<String, Object>(holder)
+                map.remove(TaskProcessor.TASK_CONFIG)
+            }
+
+            return KryoHelper.serialize(map)
+        }
+        catch( Exception e ) {
+            log.warn "Cannot serialize context map. Cause: ${e.cause} -- Resume will not work on this process"
+            log.debug "Failed to serialize delegate map items: ${dumpMap(holder)}", e
+            return null
+        }
+    }
+
+    static TaskContext deserialize(TaskProcessor processor, byte[] buffer) {
+        def map = (Map)KryoHelper.deserialize(buffer)
+        new TaskContext(processor, map)
     }
 
 
@@ -208,6 +231,7 @@ class TaskContext implements Map<String,Object>, Cloneable {
      * @param contextFile The file used to store the context map
      * @return A new {@code DelegateMap} instance holding the values read from map file
      */
+    @Deprecated
     static TaskContext read( TaskProcessor processor, Path contextFile ) {
 
         def map = (Map)KryoHelper.deserialize(contextFile)

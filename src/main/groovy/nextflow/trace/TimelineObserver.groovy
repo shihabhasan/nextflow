@@ -129,6 +129,14 @@ class TimelineObserver implements TraceObserver {
         }
     }
 
+    @Override
+    void onProcessCached(TaskHandler handler) {
+        //onProcessComplete(handler)
+    }
+
+    @Override
+    void onProcessError(TaskHandler handler, Throwable error) { }
+
     final private String REPLACE_STR = '/*REPLACE_WITH_TIMELINE_DATA*/'
 
     protected void renderHtml() {
