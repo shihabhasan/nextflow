@@ -816,27 +816,34 @@ class TaskProcessor {
         /*
          * load the task record in the cache DB
          */
-        final entry = session.getCachedTask(task.processor, hash)
 
         /*
          * verify cached context map
          */
-        TaskContext ctx = null
-        def ctxFile = folder.resolve(TaskRun.CMD_CONTEXT)
-        if( !entry && task.hasCacheableValues() ) {
-            try {
-                ctx = TaskContext.read(this, ctxFile)
-            }
-            catch( Throwable e ) {
-                log.warn1("[$task.name] Unable to resume cached task -- See log file for details", causedBy: e)
+        TaskEntry entry
+        try {
+            entry = session.cache.getTaskEntry(hash, task.processor)
+            if( !entry ) {
+                log.trace "[$task.name] Missing cache entry -- return false"
                 return false
             }
+
+            if( task.hasCacheableValues() && !entry.context ) {
+                log.trace "[$task.name] Missing cache context -- return false"
+                return false
+            }
+
+        }
+        catch( Throwable e ) {
+            log.warn1("[$task.name] Unable to resume cached task -- See log file for details", causedBy: e)
+            return false
         }
 
         /*
          * verify stdout file
          */
-        def stdoutFile = folder.resolve( TaskRun.CMD_OUTFILE )
+        final ctx = entry.context
+        final stdoutFile = folder.resolve( TaskRun.CMD_OUTFILE )
 
         try {
             // -- check if all output resources are available
@@ -859,7 +866,7 @@ class TaskProcessor {
             log.info "[${task.hashLog}] Cached process > ${task.name}"
             // -- notify cached event
             if( entry )
-                session.dispatcher.notifyCached(new CachedTaskHandler(task,entry.trace))
+                session.notifyTaskCached(new CachedTaskHandler(task,entry.trace))
 
             // -- now bind the results
             finalizeTask0(task)

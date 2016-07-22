@@ -66,12 +66,9 @@ interface TraceObserver {
     void onProcessComplete(TaskHandler handler)
 
     /**
-     * This method is when a process run raises an error
+     * method invoked when a task execution is skipped because a cached result is found
      * @param handler
-     * @param error
      */
-    void onProcessError(TaskHandler handler, Throwable error)
-
     void onProcessCached(TaskHandler handler)
 
 }

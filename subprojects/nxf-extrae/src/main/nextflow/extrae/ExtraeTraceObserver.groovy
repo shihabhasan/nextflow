@@ -165,11 +165,6 @@ class ExtraeTraceObserver implements TraceObserver {
         //onProcessComplete(handler)
     }
 
-    @Override
-    void onProcessError(TaskHandler handler, Throwable error) {
-
-    }
-
     /**
      * Extract the configuration file embedded in the distribution JAR and copy into the
      * specified file path

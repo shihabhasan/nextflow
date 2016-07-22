@@ -269,11 +269,6 @@ class TraceFileObserver implements TraceObserver {
     }
 
     @Override
-    void onProcessError(TaskHandler handler, Throwable error) {
-
-    }
-
-    @Override
     void onProcessCached(TaskHandler handler) {
         // save to the file
         writer.send { PrintWriter it -> it.println(render( handler.getTraceRecord() )); it.flush() }
