@@ -66,9 +66,9 @@ class Cache implements Closeable {
         if( !payload )
             return null
 
-        final entry = (List)KryoHelper.deserialize(payload)
-        TraceRecord trace = TraceRecord.deserialize( (byte[])entry[0] )
-        TaskContext ctx = entry[1]!=null ? TaskContext.deserialize(processor, (byte[])entry[1]) : null
+        final record = (List)KryoHelper.deserialize(payload)
+        TraceRecord trace = TraceRecord.deserialize( (byte[])record[0] )
+        TaskContext ctx = record[1]!=null ? TaskContext.deserialize(processor, (byte[])record[1]) : null
 
         return new TaskEntry(trace,ctx)
     }
