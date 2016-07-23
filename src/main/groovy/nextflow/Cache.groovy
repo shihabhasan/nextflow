@@ -19,7 +19,6 @@
  */
 
 package nextflow
-
 import com.google.common.hash.HashCode
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
@@ -34,6 +33,7 @@ import org.iq80.leveldb.Options
 import org.iq80.leveldb.impl.Iq80DBFactory
 
 /**
+ * Manages nextflow cache DB
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
@@ -49,7 +49,11 @@ class Cache implements Closeable {
         this.session=session
     }
 
-
+    /**
+     * Initialise the database structure on the underlying file system
+     *
+     * @return The {@link Cache} instance itself
+     */
     Cache open() {
         // create an unique DB path
         def path = session.workDir.resolve('.cache').resolve( session.uniqueId.toString() )
@@ -59,8 +63,14 @@ class Cache implements Closeable {
         return this
     }
 
-
-    def TaskEntry getTaskEntry(HashCode taskHash, TaskProcessor processor) {
+    /**
+     * Retrieve a task runtime information from the cache DB
+     *
+     * @param taskHash The {@link HashCode} of the task to retrieve
+     * @param processor The {@link TaskProcessor} instance to be assigned to the retrieved task
+     * @return A {link TaskEntry} instance or {@code null} if a task for the given hash does not exist
+     */
+    TaskEntry getTaskEntry(HashCode taskHash, TaskProcessor processor) {
 
         def payload = db.get(taskHash.asBytes())
         if( !payload )
@@ -73,7 +83,12 @@ class Cache implements Closeable {
         return new TaskEntry(trace,ctx)
     }
 
-    def putTaskEntry( TaskHandler handler ) {
+    /**
+     * Save task runtime information to th cache DB
+     *
+     * @param handler A {@link TaskHandler} instance
+     */
+    void putTaskEntry( TaskHandler handler ) {
 
         final task = handler.task
         final proc = task.processor
@@ -92,7 +107,9 @@ class Cache implements Closeable {
         db.put( key, KryoHelper.serialize(entry) )
     }
 
-
+    /**
+     * Close the underlying database
+     */
     @Override
     void close() {
         try {
