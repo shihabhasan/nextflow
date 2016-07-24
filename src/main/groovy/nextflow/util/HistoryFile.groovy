@@ -35,7 +35,7 @@ class HistoryFile extends File {
         super('.nextflow.history')
     }
 
-    def void write( UUID key, args ) {
+    void write( UUID key, args ) {
         assert key
         assert args != null
 
@@ -43,7 +43,7 @@ class HistoryFile extends File {
         this << "${key.toString()}\t${value}\n"
     }
 
-    def retrieveLastUniqueId() {
+    String retrieveLastUniqueId() {
         if( !exists() || empty() ) {
             return null
         }
@@ -54,7 +54,7 @@ class HistoryFile extends File {
         return splits.size()>0 ? splits[0] : null
     }
 
-    def print() {
+    void print() {
 
         if( empty() ) {
             log.info '(no history available)'
@@ -71,6 +71,7 @@ class HistoryFile extends File {
         }
         catch( FileNotFoundException e ) {
             log.debug "File not found: $this"
+            return false
         }
     }
 

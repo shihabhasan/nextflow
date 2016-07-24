@@ -94,6 +94,7 @@ class Launcher implements ExitCode {
                 new CmdHistory(),
                 new CmdInfo(),
                 new CmdList(),
+                new CmdLog(),
                 new CmdLs(),
                 new CmdPull(),
                 new CmdRun(),

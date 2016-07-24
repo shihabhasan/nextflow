@@ -265,7 +265,7 @@ class Session implements ISession {
         this.observers = createObservers()
         this.statsEnabled = observers.size()>0
 
-        cache = new Cache(this).open()
+        cache = new Cache(uniqueId).open()
     }
 
     /**

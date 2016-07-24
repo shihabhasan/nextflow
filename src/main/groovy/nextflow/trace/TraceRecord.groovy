@@ -81,7 +81,10 @@ class TraceRecord implements Serializable {
             syscw:      'num',      // -- /proc/$pid/io
             read_bytes: 'mem',      // -- /proc/$pid/io
             write_bytes:'mem',      // -- /proc/$pid/io
-            attempt:    'num'
+            attempt:    'num',
+            folder:     'str',
+            script:     'str',
+            scratch:    'str'
     ]
 
     static public Map<String,Closure<String>> FORMATTER = [
@@ -294,7 +297,7 @@ class TraceRecord implements Serializable {
      * @param converter A converter string
      * @return A string value formatted according the specified converter
      */
-    String get( String name, String converter ) {
+    String getFmtStr( String name, String converter = null ) {
         assert name
         def val = store.get(name)
 
@@ -344,7 +347,7 @@ class TraceRecord implements Serializable {
         for( int i=0; i<fields.size(); i++ ) {
             String name = fields[i]
             String format = i<formats?.size() ? formats[i] : null
-            result << (get(name, format) ?: NA)
+            result << (getFmtStr(name, format) ?: NA)
         }
 
         return result.join(separator)

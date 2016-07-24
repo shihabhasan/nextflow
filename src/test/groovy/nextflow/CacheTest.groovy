@@ -45,10 +45,7 @@ class CacheTest extends Specification {
         def hash = CacheHelper.hasher('x').hash()
 
         // -- the session object
-        def session = [:] as Session
-        session.workDir = folder
-        session.uniqueId = uuid
-        def cache = new Cache(session)
+        def cache = new Cache(uuid, folder)
 
         // -- the processor mock
         def proc = Mock(TaskProcessor)
@@ -67,7 +64,7 @@ class CacheTest extends Specification {
         when:
         cache.open()
         then:
-        folder.resolve(".cache/$uuid/db").exists()
+        folder.resolve(".nextflow.cache/$uuid/db").exists()
 
         when:
         def trace = new TraceRecord([task_id: 1, process: 'foo', exit: 0])

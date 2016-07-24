@@ -19,8 +19,12 @@
  */
 
 package nextflow
+import java.nio.file.Path
+import java.nio.file.Paths
+
 import com.google.common.hash.HashCode
 import groovy.transform.CompileStatic
+import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.processor.TaskContext
 import nextflow.processor.TaskEntry
@@ -31,7 +35,6 @@ import nextflow.util.KryoHelper
 import org.iq80.leveldb.DB
 import org.iq80.leveldb.Options
 import org.iq80.leveldb.impl.Iq80DBFactory
-
 /**
  * Manages nextflow cache DB
  *
@@ -43,10 +46,20 @@ class Cache implements Closeable {
 
     private DB db
 
-    private Session session
+    private UUID uniqueId
 
-    Cache(Session session) {
-        this.session=session
+    private Path baseDir
+
+    Cache(UUID uniqueId) {
+        this.uniqueId = uniqueId
+        this.baseDir = Paths.get('.')
+    }
+
+    /** Only for test purpose */
+    @PackageScope
+    Cache(UUID uniqueId, Path home) {
+        this.uniqueId = uniqueId
+        this.baseDir = home
     }
 
     /**
@@ -56,7 +69,7 @@ class Cache implements Closeable {
      */
     Cache open() {
         // create an unique DB path
-        def path = session.workDir.resolve('.cache').resolve( session.uniqueId.toString() )
+        def path = baseDir.resolve(".nextflow.cache/${uniqueId.toString()}")
         path.mkdirs()
         // open a LevelDB instance
         db = Iq80DBFactory.factory.open(path.resolve('db').toFile(), new Options().createIfMissing(true))
@@ -105,6 +118,22 @@ class Cache implements Closeable {
 
         // -- save in the db
         db.put( key, KryoHelper.serialize(entry) )
+    }
+
+    Cache eachRecord( Closure closure ) {
+
+        def itr = db.iterator()
+        while( itr.hasNext() ) {
+            final entry = itr.next()
+
+            final payload = (byte[])entry.value
+            final record = (List<byte[]>)KryoHelper.deserialize(payload)
+
+            TraceRecord trace = TraceRecord.deserialize(record[0])
+            closure.call(trace)
+        }
+
+        return this
     }
 
     /**

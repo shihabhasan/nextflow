@@ -199,8 +199,8 @@ class TimelineObserver implements TraceObserver {
 
     protected String labelString( TraceRecord record ) {
         def result = []
-        def duration = record.get('duration', null)
-        def memory = record.get('vmem', null)
+        def duration = record.getFmtStr('duration')
+        def memory = record.getFmtStr('vmem')
 
         if( duration )
             result << duration.toString()
