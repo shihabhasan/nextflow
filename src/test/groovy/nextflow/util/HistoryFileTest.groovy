@@ -41,32 +41,29 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
 
     def 'test add and get and find' () {
 
-        setup:
-        new File('.nextflow.history').delete()
+        given:
+        def file = Files.createTempFile('test',null)
+        file.deleteOnExit()
 
         when:
-        true
-
+        def history = new HistoryFile(file)
         then:
-        HistoryFile.history.retrieveLastUniqueId() == null
+        history.findLast() == null
 
         when:
         def id1 = UUID.randomUUID()
         def id2 = UUID.randomUUID()
         def id3 = UUID.randomUUID()
-        HistoryFile.history.write( id1, 'hello_world', [1,2,3] )
-        HistoryFile.history.write( id2, 'super_star', [1,2,3] )
-        HistoryFile.history.write( id3, 'slow_food', [1,2,3] )
+        history.write( id1, 'hello_world', [1,2,3] )
+        history.write( id2, 'super_star', [1,2,3] )
+        history.write( id3, 'slow_food', [1,2,3] )
 
         then:
-        HistoryFile.history.retrieveLastUniqueId() == id3.toString()
-        HistoryFile.history.checkById( id1.toString() )
-        HistoryFile.history.checkById( id2.toString() )
-        HistoryFile.history.checkById( id3.toString() )
-        !HistoryFile.history.checkById( UUID.randomUUID().toString() )
-
-        cleanup:
-        HistoryFile.history.delete()
+        history.findLast() == id3.toString()
+        history.checkById( id1.toString() )
+        history.checkById( id2.toString() )
+        history.checkById( id3.toString() )
+        !history.checkById( UUID.randomUUID().toString() )
 
     }
 
@@ -195,5 +192,21 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
                 '5910a50f-8656-4765-aa79-f07cef912062'
         ]
     }
+
+    def 'should find by a session by a name of ID' () {
+
+        given:
+        def file = Files.createTempFile('test',null)
+        file.deleteOnExit()
+        file.text = FILE_TEXT
+        def history = new HistoryFile(file)
+
+        expect:
+        history.findBy('last') == '5910a50f-8656-4765-aa79-f07cef912062'
+        history.findBy('evil_pike') == 'e710da1b-ce06-482f-bbcf-987a507f85d1'
+        history.findBy('b8a3c4cf') == 'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'
+        history.findBy('unknown') == null
+    }
+
 
 }

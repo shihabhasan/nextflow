@@ -40,6 +40,6 @@ class CmdHistory extends CmdBase {
 
     @Override
     void run() {
-        HistoryFile.history.print()
+        HistoryFile.DEFAULT.print()
     }
 }

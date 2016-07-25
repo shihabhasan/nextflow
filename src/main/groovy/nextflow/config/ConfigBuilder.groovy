@@ -317,7 +317,7 @@ class ConfigBuilder {
             return null
 
         if( uniqueId == 'last' ) {
-            uniqueId = HistoryFile.history.retrieveLastUniqueId()
+            uniqueId = HistoryFile.DEFAULT.findLast()
             if( !uniqueId ) {
                 log.warn "It seems you never run this project before -- Option `-resume` is ignored"
             }

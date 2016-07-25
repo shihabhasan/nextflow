@@ -36,7 +36,7 @@ import nextflow.exception.AbortOperationException
 @Slf4j
 class HistoryFile extends File {
 
-    public static final HistoryFile history = new HistoryFile()
+    public static final HistoryFile DEFAULT = new HistoryFile()
 
     private static final DateFormat TIMESTAMP_FMT = new SimpleDateFormat('yyyy-MM-dd HH:mm:ss')
 
@@ -49,12 +49,11 @@ class HistoryFile extends File {
         super('.nextflow.history')
     }
 
-    /** Only for testing purpose */
-    private HistoryFile(File file) {
+    HistoryFile(File file) {
         super(file.toString())
     }
 
-    private HistoryFile(Path file) {
+    HistoryFile(Path file) {
         super(file.toString())
     }
 
@@ -67,7 +66,7 @@ class HistoryFile extends File {
         this << "${now}\t${key.toString()}\t${name}\t${value}\n"
     }
 
-    String retrieveLastUniqueId() {
+    String findLast() {
         if( !exists() || empty() ) {
             return null
         }
@@ -166,11 +165,14 @@ class HistoryFile extends File {
      * @param str
      * @return
      */
-    String findByNameOrId( String str ) {
+    String findBy( String str ) {
+        if( str == 'last' )
+            return findLast()
+
         if( isUuidString(str) )
-            findById(str)
-        else
-            findByName(str)
+            return findById(str)
+
+        findByName(str)
     }
 
     @PackageScope
@@ -216,7 +218,7 @@ class HistoryFile extends File {
     }
 
     List<String> findBefore(String nameOrId) {
-        def sessionId = findByNameOrId(nameOrId)
+        def sessionId = findBy(nameOrId)
         if( !sessionId )
             return Collections.emptyList()
 
@@ -233,7 +235,7 @@ class HistoryFile extends File {
     }
 
     List<String> findAfter(String nameOrId) {
-        def sessionId = findByNameOrId(nameOrId)
+        def sessionId = findBy(nameOrId)
         def firstMatch = false
 
         return findAll().findResults {
@@ -247,7 +249,7 @@ class HistoryFile extends File {
     }
 
     List<String> findBut(String nameOrId) {
-        def sessionId = findByNameOrId(nameOrId)
+        def sessionId = findBy(nameOrId)
         def result = findAll()
         result?.remove(sessionId)
         return result
