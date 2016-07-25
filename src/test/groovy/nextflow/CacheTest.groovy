@@ -64,7 +64,7 @@ class CacheTest extends Specification {
         when:
         cache.open()
         then:
-        folder.resolve(".nextflow.cache/$uuid/db").exists()
+        folder.resolve(".cache/$uuid/db").exists()
 
         when:
         def trace = new TraceRecord([task_id: 1, process: 'foo', exit: 0])

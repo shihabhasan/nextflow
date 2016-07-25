@@ -36,6 +36,8 @@ import nextflow.exception.AbortOperationException
 @Slf4j
 class HistoryFile extends File {
 
+    public static final String FILE_NAME = '.nextflow.history'
+
     public static final HistoryFile DEFAULT = new HistoryFile()
 
     private static final DateFormat TIMESTAMP_FMT = new SimpleDateFormat('yyyy-MM-dd HH:mm:ss')
@@ -46,7 +48,7 @@ class HistoryFile extends File {
     private static final VAL_9 = (int)('9' as char)
 
     private HistoryFile() {
-        super('.nextflow.history')
+        super(FILE_NAME)
     }
 
     HistoryFile(File file) {

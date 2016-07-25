@@ -19,11 +19,15 @@
  */
 
 package nextflow.cli
+
+import java.nio.file.Path
+
 import ch.grengine.Grengine
 import com.beust.jcommander.Parameter
 import groovy.text.SimpleTemplateEngine
 import groovy.text.TemplateEngine
 import groovy.transform.CompileStatic
+import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.Cache
 import nextflow.exception.AbortOperationException
@@ -37,6 +41,12 @@ import nextflow.util.HistoryFile
 @Slf4j
 @CompileStatic
 class CmdLog extends CmdBase {
+
+    /**
+     * Only for testing purpose
+     */
+    @PackageScope
+    Path basePath
 
     static final NAME = 'log'
 
@@ -80,7 +90,7 @@ class CmdLog extends CmdBase {
     private void validateOptions() {
 
         if( !history ) {
-            history = HistoryFile.DEFAULT
+            history = !basePath ? HistoryFile.DEFAULT : new HistoryFile(basePath.resolve(HistoryFile.FILE_NAME))
         }
 
         if( !history.exists() || history.empty() )
@@ -151,25 +161,30 @@ class CmdLog extends CmdBase {
         List<String> allIds = getIds()
 
         // -- main
-        allIds.each { sessionId ->
-
-            // -- convert the session ID string to a UUID
-            def uuid
-            try {
-                uuid = UUID.fromString(sessionId)
-            }
-            catch( IllegalArgumentException e ) {
-                throw new AbortOperationException("Not a valid nextflow session ID: $sessionId -- It must be 128-bit UUID formatted string", e)
-            }
+        allIds.each { uuid ->
 
             // -- go
-            new Cache(uuid)
-                    .open()
-                    .eachRecord(this.&printRecord)
-                    .close()
+            cacheFor(uuid)
+                        .open()
+                        .eachRecord(this.&printRecord)
+                        .close()
 
         }
 
+    }
+
+    private Cache cacheFor(String sessionId) {
+
+        // -- convert the session ID string to a UUID
+        def uuid
+        try {
+            uuid = UUID.fromString(sessionId)
+        }
+        catch( IllegalArgumentException e ) {
+            throw new AbortOperationException("Not a valid nextflow session ID: $sessionId -- It must be 128-bit UUID formatted string", e)
+        }
+
+        !basePath ? new Cache(uuid) : new Cache(uuid,basePath)
     }
 
     /**
@@ -228,17 +243,13 @@ class CmdLog extends CmdBase {
 
         Object getVariable(String name) {
             if( record.containsKey(name) )
-                return record.getFmtStr(name)
+                return record.store.get(name)
 
             throw new MissingPropertyException(name)
         }
 
         Map getVariables() {
-            def result = [:]
-            record.store.keySet().each { k ->
-                result.put(k, record.getFmtStr(k))
-            }
-            return result
+            new HashMap(record.store)
         }
 
     }

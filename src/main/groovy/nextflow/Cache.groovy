@@ -24,7 +24,6 @@ import java.nio.file.Paths
 
 import com.google.common.hash.HashCode
 import groovy.transform.CompileStatic
-import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.processor.TaskContext
 import nextflow.processor.TaskEntry
@@ -56,7 +55,6 @@ class Cache implements Closeable {
     }
 
     /** Only for test purpose */
-    @PackageScope
     Cache(UUID uniqueId, Path home) {
         this.uniqueId = uniqueId
         this.baseDir = home
@@ -69,7 +67,7 @@ class Cache implements Closeable {
      */
     Cache open() {
         // create an unique DB path
-        def path = baseDir.resolve(".nextflow.cache/${uniqueId.toString()}")
+        def path = baseDir.resolve(".cache/${uniqueId.toString()}")
         path.mkdirs()
         // open a LevelDB instance
         db = Iq80DBFactory.factory.open(path.resolve('db').toFile(), new Options().createIfMissing(true))
