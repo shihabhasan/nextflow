@@ -78,6 +78,14 @@ class CmdLog extends CmdBase {
 
 
     private void validateOptions() {
+
+        if( !history ) {
+            history = HistoryFile.DEFAULT
+        }
+
+        if( !history.exists() || history.empty() )
+            throw new AbortOperationException("It looks no pipeline was executed in this folder (or execution history has been deleted)")
+
         if( fields && template )
             throw new AbortOperationException("Options `fields` and `template` cannot be used in the same command")
 
@@ -89,17 +97,9 @@ class CmdLog extends CmdBase {
 
         if( before && but )
             throw new AbortOperationException("Options `before` and `but` cannot be used in the same command")
-
-        if( !history.exists() || history.empty() )
-            throw new AbortOperationException("It looks no pipeline was executed in this folder (or execution history has been deleted)")
-
     }
 
     private void initialize() {
-
-        if( !history ) {
-            history = HistoryFile.DEFAULT
-        }
 
         // -- initialize the filter engine
         if( filterStr ) {
