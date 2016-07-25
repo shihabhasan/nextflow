@@ -35,6 +35,8 @@ import nextflow.script.ScriptRunner
 import nextflow.util.ConfigHelper
 import nextflow.util.CustomPoolFactory
 import nextflow.util.Duration
+import nextflow.util.NameGenerator
+
 /**
  * CLI sub-command RUN
  *
@@ -60,6 +62,9 @@ class CmdRun extends CmdBase implements HubOptions {
     }
 
     static final NAME = 'run'
+
+    @Parameter(names=['-name'], description = 'Assign a mnemonic name to the a pipeline run')
+    String name
 
     @Parameter(names=['-lib'], description = 'Library extension path')
     String libPath
@@ -172,6 +177,10 @@ class CmdRun extends CmdBase implements HubOptions {
         def scriptArgs = (args?.size()>1 ? args[1..-1] : []) as List<String>
         def scriptFile = getScriptFile(pipeline)
 
+        // -- generate a random name if required
+        if( !name )
+            name = NameGenerator.next()
+
         // create the config object
         def config = new ConfigBuilder()
                         .setOptions(launcher.options)
@@ -193,7 +202,7 @@ class CmdRun extends CmdBase implements HubOptions {
             log.debug( '\n'+info )
 
             // -- add this run to the local history
-            runner.verifyAndTrackHistory(launcher.cliString)
+            runner.verifyAndTrackHistory(launcher.cliString, name)
 
             // -- run it!
             runner.execute(scriptArgs)

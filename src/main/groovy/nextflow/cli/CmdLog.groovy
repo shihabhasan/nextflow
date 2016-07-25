@@ -55,7 +55,6 @@ class CmdLog extends CmdBase {
     @Parameter
     List<String> args
 
-
     private TemplateEngine engine
 
     @Override
@@ -77,9 +76,13 @@ class CmdLog extends CmdBase {
         }
 
         // -- get the session ID from the command line if specified or retrieve from
-        def sessionId = args ? args[0] : HistoryFile.history.retrieveLastUniqueId()
+        def sessionId = (args
+                ? HistoryFile.history.findByString(args[0])
+                : HistoryFile.history.retrieveLastUniqueId()
+        )
+
         if( !sessionId ) {
-            log.info "It looks no pipeline was executed in this folder (or execution history has been deleted)"
+            System.err.println "It looks no pipeline was executed in this folder (or execution history has been deleted)"
             return
         }
 

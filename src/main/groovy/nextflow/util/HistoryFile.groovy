@@ -19,8 +19,13 @@
  */
 
 package nextflow.util
+import java.text.DateFormat
+import java.text.SimpleDateFormat
 
+import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import nextflow.exception.AbortOperationException
+
 /**
  * Manages the history file containing the last 1000 executed commands
  *
@@ -29,18 +34,31 @@ import groovy.util.logging.Slf4j
 @Slf4j
 class HistoryFile extends File {
 
-    final static HistoryFile history = new HistoryFile()
+    public static final HistoryFile history = new HistoryFile()
+
+    private static final DateFormat TIMESTAMP_FMT = new SimpleDateFormat('yyyy-MM-dd HH:mm:ss')
+
+    private static final VAL_A = (int)('a' as char)
+    private static final VAL_F = (int)('f' as char)
+    private static final VAL_0 = (int)('0' as char)
+    private static final VAL_9 = (int)('9' as char)
 
     private HistoryFile() {
         super('.nextflow.history')
     }
 
-    void write( UUID key, args ) {
+    /** Only for testing purpose */
+    private HistoryFile(String path) {
+        super(path)
+    }
+
+    void write( UUID key, String name, args ) {
         assert key
         assert args != null
 
+        def now = TIMESTAMP_FMT.format(new Date())
         def value = args instanceof Collection ? args.join(' ') : args
-        this << "${key.toString()}\t${value}\n"
+        this << "${now}\t${key.toString()}\t${name}\t${value}\n"
     }
 
     String retrieveLastUniqueId() {
@@ -50,14 +68,21 @@ class HistoryFile extends File {
 
         def lines = readLines()
         def lastLine = lines.get(lines.size()-1)
-        def splits = lastLine.split(/\t/)
-        return splits.size()>0 ? splits[0] : null
+        def cols = lastLine.tokenize('\t')
+        if( !cols )
+            return null
+
+        (
+                cols.size() == 2
+                ? cols[0]       // legacy format: the first was the session ID
+                : cols[1]       // new format: the second is the session ID
+        )
     }
 
     void print() {
 
         if( empty() ) {
-            log.info '(no history available)'
+            System.err.println '(no history available)'
         }
         else {
             println this.text
@@ -65,14 +90,105 @@ class HistoryFile extends File {
 
     }
 
-    boolean findUniqueId( String uuid ) {
-        try {
-            readLines().find { String line -> line.startsWith(uuid) }
+    /**
+     * Check if a session ID exists in the history file
+     *
+     * @param uuid A complete UUID string or a prefix of it
+     * @return {@code true} if the UUID is found in the history file or {@code false} otherwise
+     */
+    boolean checkById( String uuid ) {
+        findById(uuid) != null
+    }
+
+    private String checkUnique(List<String> results) {
+        if( !results )
+            return null
+
+        results = results.unique()
+        if( results.size()==1 ) {
+            return results[0]
         }
-        catch( FileNotFoundException e ) {
-            log.debug "File not found: $this"
-            return false
+
+        String message = 'Which session ID do you mean?\n'
+        results.each { message += '    ' + it + '\n' }
+        throw new AbortOperationException(message)
+    }
+
+    /**
+     * Lookup a session ID given a `run` name string
+     *
+     * @param name A name of a pipeline run
+     * @return The session ID string associated to the `run` or {@code null} if it's not found
+     */
+    String findByName(String name) {
+        if( !exists() || empty() ) {
+            return null
         }
+
+        def results = readLines().findResults {  String line ->
+            def cols = line.tokenize('\t')
+            cols.size()>2 && cols[2] == name ? cols[1] : null
+        }
+
+        checkUnique(results)
+    }
+
+    /**
+     * Lookup a session ID given a part of it
+     *
+     * @param id A session ID prefix
+     * @return A complete session ID or {@code null} if the specified fragment is not found in the history
+     */
+    String findById(String id) {
+        if( !exists() || empty() ) {
+            return null
+        }
+
+        def results = this.readLines().findResults { String line ->
+            def cols = line.tokenize('\t')
+            if( cols.size() == 2 )
+                cols[0].startsWith(id) ? cols[0] : null
+            else
+                cols.size()>2 && cols[1].startsWith(id)? cols[1] : null
+        }
+
+        checkUnique(results)
+    }
+
+    /**
+     * Lookup a session ID given a run name or a
+     * @param str
+     * @return
+     */
+    String findByString( String str ) {
+        if( isUuidString(str) )
+            findById(str)
+        else
+            findByName(str)
+    }
+
+    @PackageScope
+    static boolean isUuidChar(char ch) {
+        if( ch == '-' as char )
+            return true
+
+        final x = (ch as int)
+
+        if(  x >= VAL_0 && x <= VAL_9 )
+            return true
+
+        if( x >= VAL_A && x <= VAL_F )
+            return true
+
+        return false
+    }
+
+    @PackageScope
+    static boolean isUuidString(String str) {
+        for( int i=0; i<str.size(); i++ )
+            if( !isUuidChar(str.charAt(i)))
+                return false
+        return true
     }
 
 
