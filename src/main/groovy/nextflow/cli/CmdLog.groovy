@@ -77,7 +77,7 @@ class CmdLog extends CmdBase {
 
         // -- get the session ID from the command line if specified or retrieve from
         def sessionId = (args
-                ? HistoryFile.history.findByString(args[0])
+                ? HistoryFile.history.findByNameOrId(args[0])
                 : HistoryFile.history.retrieveLastUniqueId()
         )
 

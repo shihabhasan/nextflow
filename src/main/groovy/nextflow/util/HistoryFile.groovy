@@ -19,6 +19,8 @@
  */
 
 package nextflow.util
+
+import java.nio.file.Path
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 
@@ -48,8 +50,12 @@ class HistoryFile extends File {
     }
 
     /** Only for testing purpose */
-    private HistoryFile(String path) {
-        super(path)
+    private HistoryFile(File file) {
+        super(file.toString())
+    }
+
+    private HistoryFile(Path file) {
+        super(file.toString())
     }
 
     void write( UUID key, String name, args ) {
@@ -122,7 +128,7 @@ class HistoryFile extends File {
      */
     String findByName(String name) {
         if( !exists() || empty() ) {
-            return null
+            return Collections.emptyList()
         }
 
         def results = readLines().findResults {  String line ->
@@ -160,7 +166,7 @@ class HistoryFile extends File {
      * @param str
      * @return
      */
-    String findByString( String str ) {
+    String findByNameOrId( String str ) {
         if( isUuidString(str) )
             findById(str)
         else
@@ -191,5 +197,60 @@ class HistoryFile extends File {
         return true
     }
 
+    List<String> findAll() {
+        if( !exists() || empty() ) {
+            return Collections.emptyList()
+        }
+
+        def results = []
+        this.eachLine {  String line ->
+            def cols = line.tokenize('\t')
+            if( cols.size() == 2 && !results.contains(cols[0] ))
+                results << cols[0]
+
+            else if( cols.size()>2 && !results.contains(cols[1]))
+                results << cols[1]
+        }
+
+        return results
+    }
+
+    List<String> findBefore(String nameOrId) {
+        def sessionId = findByNameOrId(nameOrId)
+        if( !sessionId )
+            return Collections.emptyList()
+
+        def firstMatch = false
+
+        return findAll().findResults {
+            if( it==sessionId ) {
+                firstMatch = true
+                return null
+            }
+
+            !firstMatch ? it : null
+        }
+    }
+
+    List<String> findAfter(String nameOrId) {
+        def sessionId = findByNameOrId(nameOrId)
+        def firstMatch = false
+
+        return findAll().findResults {
+            if( it==sessionId ) {
+                firstMatch = true
+                return null
+            }
+
+            firstMatch ? it : null
+        }
+    }
+
+    List<String> findBut(String nameOrId) {
+        def sessionId = findByNameOrId(nameOrId)
+        def result = findAll()
+        result?.remove(sessionId)
+        return result
+    }
 
 }

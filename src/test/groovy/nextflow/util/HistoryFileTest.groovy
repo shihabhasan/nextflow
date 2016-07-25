@@ -78,7 +78,7 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         file.text = FILE_TEXT
 
         when:
-        def history = new HistoryFile(file.toString())
+        def history = new HistoryFile(file)
         then:
         history.findById('b8a3c4cf') == 'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'
         history.findById('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98') == 'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'
@@ -107,7 +107,7 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         file.text = FILE_TEXT
 
         when:
-        def history = new HistoryFile(file.toString())
+        def history = new HistoryFile(file)
         then:
         history.findByName('lazy_pike') == null
         history.findByName('evil_pike') == 'e710da1b-ce06-482f-bbcf-987a507f85d1'
@@ -138,6 +138,62 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         HistoryFile.isUuidString('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
 
         !HistoryFile.isUuidString('hello_world')
+    }
+
+    def 'should find entries before the specified one' () {
+
+        given:
+        def file = Files.createTempFile('test',null)
+        file.deleteOnExit()
+        file.text = FILE_TEXT
+        def history = new HistoryFile(file)
+
+        expect:
+        history.findBefore('5a6d3877') == [
+                'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98',
+                '58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8',
+                'e710da1b-ce06-482f-bbcf-987a507f85d1'
+        ]
+
+        history.findBefore('unknown') == []
+
+    }
+
+    def 'should find entries after the specified one' () {
+
+        given:
+        def file = Files.createTempFile('test',null)
+        file.deleteOnExit()
+        file.text = FILE_TEXT
+        def history = new HistoryFile(file)
+
+        expect:
+        history.findAfter('evil_pike') == [
+                '5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9',
+                '5910a50f-8656-4765-aa79-f07cef912062',
+        ]
+
+
+        history.findAfter('unknown') == []
+    }
+
+
+    def 'should return all IDs' () {
+
+        given:
+        def file = Files.createTempFile('test',null)
+        file.deleteOnExit()
+        file.text = FILE_TEXT
+        def history = new HistoryFile(file)
+
+        expect:
+        history.findAll() == [
+                'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98',
+                '58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8',
+                'e710da1b-ce06-482f-bbcf-987a507f85d1',
+                '5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9',
+                '5910a50f-8656-4765-aa79-f07cef912062'
+        ]
     }
 
 }
