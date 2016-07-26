@@ -53,6 +53,8 @@ import nextflow.trace.TraceObserver
 import nextflow.util.Barrier
 import nextflow.util.ConfigHelper
 import nextflow.util.Duration
+import nextflow.util.NameGenerator
+
 /**
  * Holds the information on the current execution
  *
@@ -106,6 +108,11 @@ class Session implements ISession {
      * The class name used to compile the pipeline script
      */
     String scriptClassName
+
+    /**
+     * Mnemonic name of this run instance
+     */
+    String runName
 
     /**
      * Folder(s) containing libs and classes to be added to the classpath
@@ -209,13 +216,14 @@ class Session implements ISession {
         this.binding = binding
         this.config = binding.config
 
-        // poor man session object dependency injection
+        // -- poor man session object dependency injection
         Global.setSession(this)
         Global.setConfig(config)
 
+        // -- cacheable flag
         cacheable = config.cacheable
 
-        // sets resumeMode and uniqueId
+        // -- sets resumeMode and uniqueId
         if( config.resume ) {
             resumeMode = true
             uniqueId = UUID.fromString(config.resume as String)
@@ -225,7 +233,10 @@ class Session implements ISession {
         }
         log.debug "Session uuid: $uniqueId"
 
-        // normalize taskConfig object
+        // -- set the run name
+        this.runName = config.runName ?: NameGenerator.next()
+
+        // -- normalize taskConfig object
         if( config.process == null ) config.process = [:]
         if( config.env == null ) config.env = [:]
 
@@ -234,13 +245,14 @@ class Session implements ISession {
             config.poolSize = cpus==1 ? 2 : cpus
         }
 
-        //set the thread pool size
+        // -- set the thread pool size
         this.poolSize = config.poolSize as int
         log.debug "Executor pool size: ${poolSize}"
 
-        // create the task dispatcher instance
+        // -- create the task dispatcher instance
         this.dispatcher = new TaskDispatcher(this)
 
+        // -- DGA object
         this.dag = new DAG(session:this)
     }
 
@@ -759,32 +771,5 @@ class Session implements ISession {
         return find.invoke(ClassLoader.getSystemClassLoader(), className)
     }
 
-
-//    /**
-//     * Create a table report of all executed or running tasks
-//     *
-//     * @return A string table formatted displaying the tasks information
-//     */
-//    String tasksReport() {
-//
-//        TableBuilder table = new TableBuilder()
-//                .head('name')
-//                .head('id')
-//                .head('status')
-//                .head('path')
-//                .head('exit')
-//
-//        tasks.entries().each { Map.Entry<Processor, TaskDef> entry ->
-//            table << entry.key.name
-//            table << entry.value.id
-//            table << entry.value.status
-//            table << entry.value.workDirectory
-//            table << entry.value.exitCode
-//            table << table.closeRow()
-//        }
-//
-//        table.toString()
-//
-//    }
 
 }

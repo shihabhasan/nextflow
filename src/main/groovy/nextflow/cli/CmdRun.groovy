@@ -27,16 +27,14 @@ import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import groovyx.gpars.GParsConfig
 import nextflow.Const
+import nextflow.config.ConfigBuilder
 import nextflow.exception.AbortOperationException
 import nextflow.scm.AssetManager
-import nextflow.config.ConfigBuilder
 import nextflow.script.ScriptFile
 import nextflow.script.ScriptRunner
 import nextflow.util.ConfigHelper
 import nextflow.util.CustomPoolFactory
 import nextflow.util.Duration
-import nextflow.util.NameGenerator
-
 /**
  * CLI sub-command RUN
  *
@@ -64,7 +62,7 @@ class CmdRun extends CmdBase implements HubOptions {
     static final NAME = 'run'
 
     @Parameter(names=['-name'], description = 'Assign a mnemonic name to the a pipeline run')
-    String name
+    String runName
 
     @Parameter(names=['-lib'], description = 'Library extension path')
     String libPath
@@ -177,10 +175,6 @@ class CmdRun extends CmdBase implements HubOptions {
         def scriptArgs = (args?.size()>1 ? args[1..-1] : []) as List<String>
         def scriptFile = getScriptFile(pipeline)
 
-        // -- generate a random name if required
-        if( !name )
-            name = NameGenerator.next()
-
         // create the config object
         def config = new ConfigBuilder()
                         .setOptions(launcher.options)
@@ -202,7 +196,7 @@ class CmdRun extends CmdBase implements HubOptions {
             log.debug( '\n'+info )
 
             // -- add this run to the local history
-            runner.verifyAndTrackHistory(launcher.cliString, name)
+            runner.verifyAndTrackHistory(launcher.cliString, runner.session.runName)
 
             // -- run it!
             runner.execute(scriptArgs)

@@ -34,9 +34,9 @@ class HistoryFileTest extends Specification {
 b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sample.fa
 b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sample.fa -resume
 58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8\tnextflow run examples/basic.nf --in data/sample.fa
-2016-07-24 16:43:16\te710da1b-ce06-482f-bbcf-987a507f85d1\tevil_pike\t./launch.sh run hello
-2016-07-24 16:43:34\t5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9\tgigantic_keller\t./launch.sh run hello
-2016-07-25 09:58:01\t5910a50f-8656-4765-aa79-f07cef912062\tmodest_bartik\t./launch.sh run hello
+2016-07-24 16:43:16\tevil_pike\te710da1b-ce06-482f-bbcf-987a507f85d1\t./launch.sh run hello
+2016-07-24 16:43:34\tgigantic_keller\t5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9\t./launch.sh run hello
+2016-07-25 09:58:01\tmodest_bartik\t5910a50f-8656-4765-aa79-f07cef912062\t./launch.sh run hello
 '''
 
     def 'test add and get and find' () {

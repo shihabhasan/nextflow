@@ -65,7 +65,7 @@ class HistoryFile extends File {
 
         def now = TIMESTAMP_FMT.format(new Date())
         def value = args instanceof Collection ? args.join(' ') : args
-        this << "${now}\t${key.toString()}\t${name}\t${value}\n"
+        this << "${now}\t${name}\t${key.toString()}\t${value}\n"
     }
 
     String findLast() {
@@ -82,7 +82,7 @@ class HistoryFile extends File {
         (
                 cols.size() == 2
                 ? cols[0]       // legacy format: the first was the session ID
-                : cols[1]       // new format: the second is the session ID
+                : cols[2]       // new format: the session ID is the third row
         )
     }
 
@@ -134,7 +134,7 @@ class HistoryFile extends File {
 
         def results = readLines().findResults {  String line ->
             def cols = line.tokenize('\t')
-            cols.size()>2 && cols[2] == name ? cols[1] : null
+            cols.size()>2 && cols[1] == name ? cols[2] : null
         }
 
         checkUnique(results)
@@ -156,7 +156,7 @@ class HistoryFile extends File {
             if( cols.size() == 2 )
                 cols[0].startsWith(id) ? cols[0] : null
             else
-                cols.size()>2 && cols[1].startsWith(id)? cols[1] : null
+                cols.size()>2 && cols[2].startsWith(id)? cols[2] : null
         }
 
         checkUnique(results)
@@ -212,8 +212,8 @@ class HistoryFile extends File {
             if( cols.size() == 2 && !results.contains(cols[0] ))
                 results << cols[0]
 
-            else if( cols.size()>2 && !results.contains(cols[1]))
-                results << cols[1]
+            else if( cols.size()>2 && !results.contains(cols[2]))
+                results << cols[2]
         }
 
         return results
@@ -255,6 +255,17 @@ class HistoryFile extends File {
         def result = findAll()
         result?.remove(sessionId)
         return result
+    }
+
+    void eachRow(Closure action) {
+        this.eachLine { String line ->
+            def cols = line.tokenize('\t')
+            if( cols.size() == 2 )
+                ['-', '-', cols[0], cols[1]]
+            else
+                cols
+            action.call(cols)
+        }
     }
 
 }

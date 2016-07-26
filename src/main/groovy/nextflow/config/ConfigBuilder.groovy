@@ -19,7 +19,6 @@
  */
 
 package nextflow.config
-
 import static nextflow.util.ConfigHelper.parseValue
 
 import java.nio.file.Path
@@ -331,6 +330,10 @@ class ConfigBuilder {
 
         // -- set config options
         config.cacheable = cmdRun.cacheable
+
+        // -- set the run name
+        if( cmdRun.runName )
+            config.runName = cmdRun.runName
 
         // -- sets the working directory
         if( cmdRun.workDir )

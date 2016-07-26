@@ -32,6 +32,7 @@ import groovy.util.logging.Slf4j
 import nextflow.Cache
 import nextflow.exception.AbortOperationException
 import nextflow.trace.TraceRecord
+import nextflow.ui.TableBuilder
 import nextflow.util.HistoryFile
 /**
  * Implements the `log` command to print tasks runtime information of an execute pipeline
@@ -83,6 +84,8 @@ class CmdLog extends CmdBase {
 
     private HistoryFile history
 
+    private boolean showHistory
+
     @Override
     final String getName() { NAME }
 
@@ -107,6 +110,8 @@ class CmdLog extends CmdBase {
 
         if( before && but )
             throw new AbortOperationException("Options `before` and `but` cannot be used in the same command")
+
+        showHistory = !args && !before && !after && !but
     }
 
     private void initialize() {
@@ -126,7 +131,7 @@ class CmdLog extends CmdBase {
         }
     }
 
-    private List<String> getIds() {
+    private List<String> listIds() {
 
         if( but ) {
             return history.findBut(but)
@@ -158,10 +163,14 @@ class CmdLog extends CmdBase {
             return
         }
 
-        List<String> allIds = getIds()
+        // -- show the current history and exit
+        if( showHistory ) {
+            printHistory()
+            return
+        }
 
         // -- main
-        allIds.each { uuid ->
+        listIds().each { uuid ->
 
             // -- go
             cacheFor(uuid)
@@ -213,8 +222,22 @@ class CmdLog extends CmdBase {
                 .toString()
     }
 
+    private void printHistory() {
+        def table = new TableBuilder(cellSeparator: '\t')
+                    .head('TIMESTAMP')
+                    .head('RUN NAME')
+                    .head('SESSION ID')
+                    .head('COMMAND')
+
+        history.eachRow { List row ->
+            table.append(row)
+        }
+
+        println table.toString()
+    }
+
     /**
-     * Wrap a {@link TraceRecord} instance as a {@link Map}
+     * Wrap a {@link TraceRecord} instance as a {@link Map} or a {@link Binding} object
      */
     private static class TraceAdaptor extends Binding {
 

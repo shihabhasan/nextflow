@@ -49,7 +49,7 @@ class CmdLogTest extends Specification {
     OutputCapture capture = new OutputCapture()
 
     def setupSpec () {
-        LoggerHelper.configureLogger(new CliOptions())
+        LoggerHelper.configureLogger(new CliOptions(quiet: true))
     }
 
     def 'should print the folders for executed tasks' () {
@@ -93,7 +93,7 @@ class CmdLogTest extends Specification {
         history.write(uuid,'test_1','run')
 
         when:
-        def log = new CmdLog(basePath: folder)
+        def log = new CmdLog(basePath: folder, args: ['test_1'])
         log.run()
         def stdout = capture.toString()
         then:
@@ -146,7 +146,7 @@ class CmdLogTest extends Specification {
 
 
         when:
-        def log = new CmdLog(basePath: folder, filterStr: 'exit == 0')
+        def log = new CmdLog(basePath: folder, filterStr: 'exit == 0', args: ['test_1'])
         log.run()
 
         def stdout = capture.toString()
