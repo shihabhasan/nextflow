@@ -146,7 +146,8 @@ class CmdLog extends CmdBase {
         }
 
         // -- get the session ID from the command line if specified or retrieve from
-        [history.findBy(args ? args[0] : 'last')]
+        def sessionId = history.findBy(args ? args[0] : 'last')
+        sessionId ? [sessionId] : Collections.<String>emptyList()
     }
 
     /**

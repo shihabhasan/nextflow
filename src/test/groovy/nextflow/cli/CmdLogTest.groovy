@@ -31,11 +31,9 @@ import nextflow.script.TaskBody
 import nextflow.trace.TraceRecord
 import nextflow.util.CacheHelper
 import nextflow.util.HistoryFile
-import nextflow.util.LoggerHelper
 import org.junit.Rule
 import spock.lang.Specification
 import test.OutputCapture
-
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -47,10 +45,6 @@ class CmdLogTest extends Specification {
      */
     @Rule
     OutputCapture capture = new OutputCapture()
-
-    def setupSpec () {
-        LoggerHelper.configureLogger(new CliOptions(quiet: true))
-    }
 
     def 'should print the folders for executed tasks' () {
 
@@ -95,7 +89,12 @@ class CmdLogTest extends Specification {
         when:
         def log = new CmdLog(basePath: folder, args: ['test_1'])
         log.run()
-        def stdout = capture.toString()
+        def stdout = capture
+                .toString()
+                .readLines()
+                // remove the log part
+                .findResults { line -> !line.contains('[main]') ? line : null }
+                .join('\n')
         then:
         stdout.readLines().size() == 3
         stdout.readLines().contains( "$folder/aaa" .toString())
@@ -149,7 +148,12 @@ class CmdLogTest extends Specification {
         def log = new CmdLog(basePath: folder, filterStr: 'exit == 0', args: ['test_1'])
         log.run()
 
-        def stdout = capture.toString()
+        def stdout = capture
+                .toString()
+                .readLines()
+                // remove the log part
+                .findResults { line -> !line.contains('[main]') ? line : null }
+                .join('\n')
         then:
         stdout.readLines().size() == 2
         stdout.readLines().contains( "$folder/aaa" .toString())

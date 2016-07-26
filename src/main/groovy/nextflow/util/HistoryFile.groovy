@@ -261,9 +261,7 @@ class HistoryFile extends File {
         this.eachLine { String line ->
             def cols = line.tokenize('\t')
             if( cols.size() == 2 )
-                ['-', '-', cols[0], cols[1]]
-            else
-                cols
+                cols = ['-', '-', cols[0], cols[1]]
             action.call(cols)
         }
     }
