@@ -93,7 +93,7 @@ class CmdLogTest extends Specification {
                 .toString()
                 .readLines()
                 // remove the log part
-                .findResults { line -> !line.contains('[main]') ? line : null }
+                .findResults { line -> !line.contains('DEBUG') ? line : null }
                 .join('\n')
         then:
         stdout.readLines().size() == 3
@@ -152,7 +152,7 @@ class CmdLogTest extends Specification {
                 .toString()
                 .readLines()
                 // remove the log part
-                .findResults { line -> !line.contains('[main]') ? line : null }
+                .findResults { line -> !line.contains('DEBUG') ? line : null }
                 .join('\n')
         then:
         stdout.readLines().size() == 2
