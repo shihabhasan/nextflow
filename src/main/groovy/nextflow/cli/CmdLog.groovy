@@ -19,18 +19,17 @@
  */
 
 package nextflow.cli
-
 import java.nio.file.Path
 
 import ch.grengine.Grengine
 import com.beust.jcommander.Parameter
-import groovy.text.SimpleTemplateEngine
-import groovy.text.TemplateEngine
+import groovy.text.Template
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.Cache
 import nextflow.exception.AbortOperationException
+import nextflow.processor.TaskTemplateEngine
 import nextflow.trace.TraceRecord
 import nextflow.ui.TableBuilder
 import nextflow.util.HistoryFile
@@ -58,7 +57,7 @@ class CmdLog extends CmdBase {
     String fields = 'folder'
 
     @Parameter(names = ['-t','-template'], description = 'Text template used to each record in the log ')
-    String template
+    String templateStr
 
     @Parameter(names=['-l','-list-fields'], description = 'Show all available fields', arity = 0)
     boolean listFields
@@ -78,13 +77,13 @@ class CmdLog extends CmdBase {
     @Parameter
     List<String> args
 
-    private TemplateEngine engine
-
     private Script filterScript
 
     private HistoryFile history
 
     private boolean showHistory
+
+    private Template templateScript
 
     @Override
     final String getName() { NAME }
@@ -99,7 +98,7 @@ class CmdLog extends CmdBase {
         if( !history.exists() || history.empty() )
             throw new AbortOperationException("It looks no pipeline was executed in this folder (or execution history has been deleted)")
 
-        if( fields && template )
+        if( fields && templateStr )
             throw new AbortOperationException("Options `fields` and `template` cannot be used in the same command")
 
         if( after && before )
@@ -122,13 +121,14 @@ class CmdLog extends CmdBase {
         }
 
         // -- initialize the template engine
-        engine = new SimpleTemplateEngine()
-        if( !template ) {
-            template = fields.tokenize(',  \n').collect { '$'+it } .join(sep)
+        if( !templateStr ) {
+            templateStr = fields.tokenize(',  \n').collect { '$'+it } .join(sep)
         }
-        else if( new File(template).exists() ) {
-            template = new File(template).text
+        else if( new File(templateStr).exists() ) {
+            templateStr = new File(templateStr).text
         }
+
+        templateScript = new TaskTemplateEngine().createTemplate(templateStr)
     }
 
     private List<String> listIds() {
@@ -198,7 +198,7 @@ class CmdLog extends CmdBase {
     }
 
     /**
-     * Print a log {@link TraceRecord} the the standard output by using the specified {@link #template}
+     * Print a log {@link TraceRecord} the the standard output by using the specified {@link #templateStr}
      *
      * @param record A {@link TraceRecord} instance representing a task runtime information
      */
@@ -217,10 +217,7 @@ class CmdLog extends CmdBase {
             }
         }
 
-        println engine
-                .createTemplate(template)
-                .make(adaptor)
-                .toString()
+        println templateScript.make(adaptor).toString()
     }
 
     private void printHistory() {
