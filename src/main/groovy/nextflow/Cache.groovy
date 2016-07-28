@@ -31,6 +31,7 @@ import nextflow.processor.TaskEntry
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
 import nextflow.trace.TraceRecord
+import nextflow.util.CacheHelper
 import nextflow.util.KryoHelper
 import org.iq80.leveldb.DB
 import org.iq80.leveldb.Options
@@ -50,19 +51,33 @@ class Cache implements Closeable {
 
     private Path baseDir
 
+    private Path dataDir
+
     private Agent writer
 
+    private RandomAccessFile index
+
+    private final int KEY_SIZE
+
+
     Cache(UUID uniqueId) {
-        this.uniqueId = uniqueId
-        this.baseDir = Paths.get('.')
-        this.writer = new Agent()
+        this(uniqueId, Paths.get('.'))
     }
 
     /** Only for test purpose */
     Cache(UUID uniqueId, Path home) {
+        this.KEY_SIZE = CacheHelper.hasher('x').hash().asBytes().size()
         this.uniqueId = uniqueId
         this.baseDir = home
+        this.dataDir = baseDir.resolve(".cache/${uniqueId.toString()}")
         this.writer = new Agent()
+    }
+
+    private void openDb() {
+        // make sure the db path exists
+        dataDir.mkdirs()
+        // open a LevelDB instance
+        db = Iq80DBFactory.factory.open(dataDir.resolve('db').toFile(), new Options().createIfMissing(true))
     }
 
     /**
@@ -71,11 +86,16 @@ class Cache implements Closeable {
      * @return The {@link Cache} instance itself
      */
     Cache open() {
-        // create an unique DB path
-        def path = baseDir.resolve(".cache/${uniqueId.toString()}")
-        path.mkdirs()
-        // open a LevelDB instance
-        db = Iq80DBFactory.factory.open(path.resolve('db').toFile(), new Options().createIfMissing(true))
+        openDb()
+        def file = dataDir.resolve('index').toFile(); file.delete()
+        index = new RandomAccessFile(file, 'rw')
+        return this
+    }
+
+    Cache openForRead() {
+        openDb()
+        def file = dataDir.resolve('index').toFile()
+        index = new RandomAccessFile(file, 'r')
         return this
     }
 
@@ -127,17 +147,29 @@ class Cache implements Closeable {
         writer.send { putTaskEntry(handler) }
     }
 
+    void putTaskIndex( TaskHandler handler ) {
+        writer.send { index.write(handler.task.hash.asBytes()) }
+    }
+
     Cache eachRecord( Closure closure ) {
+        assert closure
 
-        def itr = db.iterator()
-        while( itr.hasNext() ) {
-            final entry = itr.next()
+        def key = new byte[KEY_SIZE]
+        while( index.read(key) != -1) {
 
-            final payload = (byte[])entry.value
+            final payload = (byte[])db.get(key)
+            if( !payload ) {
+                log.trace "Unable to retrieve cache record for key: ${-> HashCode.fromBytes(key)}"
+                continue
+            }
+
             final record = (List<byte[]>)KryoHelper.deserialize(payload)
-
             TraceRecord trace = TraceRecord.deserialize(record[0])
-            closure.call(trace)
+
+            if( closure.maximumNumberOfParameters==2 )
+                closure.call(HashCode.fromBytes(key), trace)
+            else
+                closure.call(trace)
         }
 
         return this
@@ -148,12 +180,8 @@ class Cache implements Closeable {
      */
     @Override
     void close() {
-        try {
-            writer.await()
-            db.close()
-        }
-        catch( IOException e ) {
-            log.debug "Failed to close cache DB -- Cause: ${e.message ?: e}"
-        }
+        writer.await()
+        index.closeQuietly()
+        db.closeQuietly()
     }
 }

@@ -601,6 +601,9 @@ class Session implements ISession {
     void notifyTaskSubmit( TaskHandler handler ) {
         final task = handler.task
         log.info "[${task.hashLog}] ${task.runType.message} > ${task.name}"
+        // -- save a record in the cache index
+        cache.putTaskIndex(handler)
+
         for( TraceObserver it : observers ) {
             try {
                 it.onProcessSubmit(handler)
@@ -632,7 +635,7 @@ class Session implements ISession {
      */
     void notifyTaskComplete( TaskHandler handler ) {
         // save the completed task in the cache DB
-        cache.putTaskEntry(handler)
+        cache.putTaskAsync(handler)
 
         // notify the event to the observers
         for( TraceObserver it : observers ) {

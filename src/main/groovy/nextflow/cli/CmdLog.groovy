@@ -29,6 +29,8 @@ import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.Cache
 import nextflow.exception.AbortOperationException
+import nextflow.file.FileHelper
+import nextflow.processor.TaskRun
 import nextflow.processor.TaskTemplateEngine
 import nextflow.trace.TraceRecord
 import nextflow.ui.TableBuilder
@@ -41,6 +43,8 @@ import nextflow.util.HistoryFile
 @Slf4j
 @CompileStatic
 class CmdLog extends CmdBase {
+
+    static int MAX_LINES = 100
 
     /**
      * Only for testing purpose
@@ -175,7 +179,7 @@ class CmdLog extends CmdBase {
 
             // -- go
             cacheFor(uuid)
-                        .open()
+                        .openForRead()
                         .eachRecord(this.&printRecord)
                         .close()
 
@@ -258,6 +262,23 @@ class CmdLog extends CmdBase {
             if( delegate.containsKey(key) ) {
                 return delegate.get(key)
             }
+
+            if( key == 'stdout' ) {
+                return fetch(getWorkDir().resolve(TaskRun.CMD_OUTFILE))
+            }
+
+            if( key == 'stderr' ) {
+                return fetch(getWorkDir().resolve(TaskRun.CMD_ERRFILE))
+            }
+
+            if( key == 'log' ) {
+                return fetch(getWorkDir().resolve(TaskRun.CMD_LOG))
+            }
+
+            if( key == 'env' ) {
+                return fetch(getWorkDir().resolve(TaskRun.CMD_ENV))
+            }
+
             return record.getFmtStr(key.toString())
         }
 
@@ -273,5 +294,29 @@ class CmdLog extends CmdBase {
             new HashMap(record.store)
         }
 
+        private Path getWorkDir() {
+            def folder = (String)record.get('folder')
+            folder ? FileHelper.asPath(folder) : null
+        }
+
+        private String fetch(Path path) {
+            try {
+                int c=0
+                def result = new StringBuilder()
+                path.withReader { reader ->
+                    String line
+                    while( line=reader.readLine() && c++<MAX_LINES ) {
+                        result << line
+                    }
+                }
+
+                result.toString() ?: TraceRecord.NA
+
+            }
+            catch( IOError e ) {
+                log.debug "Failed to fetch content for file: $path -- Cause: ${e.message ?: e}"
+                return TraceRecord.NA
+            }
+        }
     }
 }

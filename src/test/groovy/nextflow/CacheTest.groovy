@@ -21,6 +21,7 @@
 package nextflow
 import java.nio.file.Files
 
+import com.google.common.hash.HashCode
 import nextflow.executor.CachedTaskHandler
 import nextflow.processor.ProcessConfig
 import nextflow.processor.TaskContext
@@ -36,6 +37,7 @@ import spock.lang.Specification
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 class CacheTest extends Specification {
+
 
     def 'should save and read a task entry in the cache db' () {
 
@@ -65,6 +67,7 @@ class CacheTest extends Specification {
         cache.open()
         then:
         folder.resolve(".cache/$uuid/db").exists()
+        folder.resolve(".cache/$uuid/index").exists()
 
         when:
         def trace = new TraceRecord([task_id: 1, process: 'foo', exit: 0])
@@ -90,6 +93,78 @@ class CacheTest extends Specification {
 
         cleanup:
         cache?.close()
+        folder?.deleteDir()
+
+    }
+
+
+    private makeTaskHandler(HashCode hash, Map record, Map context=null) {
+
+        // -- the processor mock
+        def proc = Mock(TaskProcessor)
+        proc.getTaskBody() >> new TaskBody(null,'source')
+        proc.getConfig() >> new ProcessConfig([:])
+
+        // -- the task context
+        def ctx = new TaskContext()
+        if( context )
+            ctx.setHolder(context)
+
+        // -- the task mock
+        def task = Mock(TaskRun)
+        task.getProcessor() >> proc
+        task.getHash() >> hash
+
+        def trace = new TraceRecord()
+        return new CachedTaskHandler(task, trace)
+
+    }
+
+    def 'should write some tasks and iterate over them' () {
+
+
+        setup:
+        def folder = Files.createTempDirectory('test')
+        def uuid = UUID.randomUUID()
+        def hash1 = CacheHelper.hasher('x').hash()
+        def hash2 = CacheHelper.hasher('x').hash()
+        def hash3 = CacheHelper.hasher('x').hash()
+
+        when:
+        def cache = new Cache(uuid, folder).open()
+
+        def h1 = makeTaskHandler(hash1, [task_id: 1, process: 'foo', exit: 0])
+        cache.putTaskEntry(h1)
+        cache.putTaskIndex(h1)
+
+        def h2 = makeTaskHandler(hash2, [task_id: 2, process: 'bar', exit: 0])
+        cache.putTaskEntry(h2)
+        cache.putTaskIndex(h2)
+
+        def h3 = makeTaskHandler(hash3, [task_id: 3, process: 'baz', exit: 1])
+        cache.putTaskEntry(h3)
+        cache.putTaskIndex(h3)
+
+        // done
+        cache.close()
+
+        then:
+        noExceptionThrown()
+
+
+        when:
+        cache.openForRead()
+        def items = []
+        cache.eachRecord { k, v -> items << ( [hash: k, record: v] ) }
+        cache.close()
+        then:
+        items.size() == 3
+        items[0].hash == hash1
+        items[1].hash == hash2
+        items[2].hash == hash3
+
+
+        cleanup:
         folder?.deleteDir()
 
     }
