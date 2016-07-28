@@ -25,6 +25,7 @@ import java.nio.file.Paths
 import com.google.common.hash.HashCode
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import groovyx.gpars.agent.Agent
 import nextflow.processor.TaskContext
 import nextflow.processor.TaskEntry
 import nextflow.processor.TaskHandler
@@ -49,15 +50,19 @@ class Cache implements Closeable {
 
     private Path baseDir
 
+    private Agent writer
+
     Cache(UUID uniqueId) {
         this.uniqueId = uniqueId
         this.baseDir = Paths.get('.')
+        this.writer = new Agent()
     }
 
     /** Only for test purpose */
     Cache(UUID uniqueId, Path home) {
         this.uniqueId = uniqueId
         this.baseDir = home
+        this.writer = new Agent()
     }
 
     /**
@@ -118,6 +123,10 @@ class Cache implements Closeable {
         db.put( key, KryoHelper.serialize(entry) )
     }
 
+    void putTaskAsync( TaskHandler handler ) {
+        writer.send { putTaskEntry(handler) }
+    }
+
     Cache eachRecord( Closure closure ) {
 
         def itr = db.iterator()
@@ -140,6 +149,7 @@ class Cache implements Closeable {
     @Override
     void close() {
         try {
+            writer.await()
             db.close()
         }
         catch( IOException e ) {
