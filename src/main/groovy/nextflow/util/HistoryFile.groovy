@@ -116,19 +116,6 @@ class HistoryFile extends File {
         }
     }
 
-    private Entry checkUnique(List<Entry> results) {
-        if( !results )
-            return null
-
-        results = results.unique()
-        if( results.size()==1 ) {
-            return results[0]
-        }
-
-        String message = 'Which session ID do you mean?\n'
-        results.each { message += "    $it\n" }
-        throw new AbortOperationException(message)
-    }
 
     /**
      * Lookup a session ID given a `run` name string
@@ -141,7 +128,7 @@ class HistoryFile extends File {
             return null
         }
 
-        def results = (List<Entry>)readLines().findResults {  String line ->
+        def result = readLines().findResult {  String line ->
             try {
                 def current = line ? Entry.parse(line) : null
                 if( current?.runName == name )
@@ -153,18 +140,7 @@ class HistoryFile extends File {
             }
         }
 
-        checkUnique(results)
-    }
-
-    /**
-     * Lookup a session ID given a part of it
-     *
-     * @param id A session ID prefix
-     * @return A complete session ID or {@code null} if the specified fragment is not found in the history
-     */
-    Entry getById(String id) {
-        def results = findById(id)
-        checkUnique(results)
+        return result
     }
 
     List<Entry> findById(String id) {
@@ -172,7 +148,7 @@ class HistoryFile extends File {
             return null
         }
 
-        def results = (List<Entry>)this.readLines().findResults { String line ->
+        def found = (List<Entry>)this.readLines().findResults { String line ->
             try {
                 def current = line ? Entry.parse(line) : null
                 if( current && current.sessionId.toString().startsWith(id) ) {
@@ -185,32 +161,34 @@ class HistoryFile extends File {
             }
         }
 
+        def results = found.unique()
+
+        // check the multiple results belong to the same session
+        def sessions = results.collect { it.sessionId } .unique()
+        if( sessions.size()>1 ) {
+            String message = 'Which session ID do you mean?\n'
+            sessions.each { message += "    $it\n" }
+            throw new AbortOperationException(message)
+        }
+
         return results
     }
 
-    /**
-     * Lookup a session ID given a run name or a
-     * @param str
-     * @return
-     */
-    Entry getByIdOrName( String str ) {
-        if( str == 'last' )
-            return getLast()
-
-        if( isUuidString(str) )
-            return getById(str)
-
-        getByName(str)
-    }
 
     List<Entry> findByIdOrName( String str ) {
-        if( str == 'last' )
-            return [getLast()]
+        if( str == 'last' ) {
+            def entry = getLast()
+            return entry ? [entry] : Collections.emptyList()
+        }
 
         if( isUuidString(str) )
             return findById(str)
 
-        return [getByName(str)]
+        else {
+            def entry = getByName(str)
+            return entry ? [entry] : Collections.emptyList()
+        }
+
     }
 
     @PackageScope

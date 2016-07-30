@@ -63,8 +63,10 @@ class CmdClean extends CmdBase implements CacheBase {
     @Parameter
     List<String> args
 
+    private Cache currentCacheDb
 
-    private Cache currentCache
+    private Map<HashCode, Integer> dryHash = new HashMap<>()
+
 
     @Override
     String getName() {
@@ -91,28 +93,25 @@ class CmdClean extends CmdBase implements CacheBase {
 
 
     private void cleanupCache(Entry entry) {
-        currentCache = cacheFor(entry).openForRead()
+        currentCacheDb = cacheFor(entry).openForRead()
         // -- remove each entry and work dir
-        currentCache.eachRecord(this.&removeRecord)
+        currentCacheDb.eachRecord(this.&removeRecord)
         // -- close the cache
-        currentCache.close()
+        currentCacheDb.close()
 
         // -- STOP HERE !
         if( dryRun ) return
 
         // -- remove the index file
-        currentCache.dropIndex()
+        currentCacheDb.dropIndex()
         // -- remove the session from the history file
         history.deleteEntry(entry)
         // -- check if exists another history entry for the same session
         if( !history.checkExistsById(entry.sessionId)) {
-            currentCache.drop()
+            currentCacheDb.drop()
         }
 
     }
-
-
-    private Map<HashCode, Integer> dryHash = new HashMap<>()
 
     private boolean wouldRemove(HashCode hash, Integer refCount) {
 
@@ -141,6 +140,8 @@ class CmdClean extends CmdBase implements CacheBase {
 
         if( refCount > 1 ) {
             // don't remove it because it's referenced by another run instance
+            if( !quiet )
+                println "Won't remove ${record.workDir}"
             return
         }
 
@@ -152,7 +153,7 @@ class CmdClean extends CmdBase implements CacheBase {
                 println "Removed ${record.workDir}"
 
             // decrement the ref count in the db
-            currentCache.decTaskEntry(hash)
+            currentCacheDb.decTaskEntry(hash)
         }
         catch(IOException e) {
             log.warn "Unable to delete: ${record.workDir} -- Cause: ${e.message ?: e}"
