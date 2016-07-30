@@ -21,6 +21,7 @@
 package nextflow.util
 
 import spock.lang.Specification
+import spock.lang.Timeout
 
 /**
  *
@@ -35,5 +36,14 @@ class NameGeneratorTest extends Specification {
         NameGenerator.ADJECTIVES.contains(adj)
         NameGenerator.NAMES.contains(name)
 
+    }
+
+    @Timeout(1)
+    def 'should not generate a random name except the specified one' () {
+        when:
+        def name = NameGenerator.next('evil_pike')
+        then:
+        name
+        name != 'evil_pike'
     }
 }

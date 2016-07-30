@@ -39,6 +39,8 @@ import nextflow.util.MemoryUnit
 @CompileStatic
 class TraceRecord implements Serializable {
 
+    public static String FOLDER = 'folder'
+
     public TraceRecord() {
         this.store = [:]
     }
@@ -82,7 +84,7 @@ class TraceRecord implements Serializable {
             read_bytes: 'mem',      // -- /proc/$pid/io
             write_bytes:'mem',      // -- /proc/$pid/io
             attempt:    'num',
-            folder:     'str',
+            (FOLDER):   'str',
             script:     'str',
             scratch:    'str'
     ]
@@ -333,6 +335,8 @@ class TraceRecord implements Serializable {
     }
 
     def getTaskId() { get('task_id') }
+
+    String getWorkDir() { get(FOLDER) }
 
     /**
      * Render the specified list of fields to a single string value

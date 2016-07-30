@@ -19,15 +19,14 @@
  */
 
 package nextflow.util
-
 import java.nio.file.Path
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 
+import groovy.transform.EqualsAndHashCode
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.exception.AbortOperationException
-
 /**
  * Manages the history file containing the last 1000 executed commands
  *
@@ -68,22 +67,20 @@ class HistoryFile extends File {
         this << "${now}\t${name}\t${key.toString()}\t${value}\n"
     }
 
-    String findLast() {
+    Entry findLast() {
         if( !exists() || empty() ) {
             return null
         }
 
         def lines = readLines()
         def lastLine = lines.get(lines.size()-1)
-        def cols = lastLine.tokenize('\t')
-        if( !cols )
+        try {
+            lastLine ? Entry.parse(lastLine) : null
+        }
+        catch( IllegalArgumentException e ) {
+            log.debug e.message
             return null
-
-        (
-                cols.size() == 2
-                ? cols[0]       // legacy format: the first was the session ID
-                : cols[2]       // new format: the session ID is the third row
-        )
+        }
     }
 
     void print() {
@@ -103,11 +100,24 @@ class HistoryFile extends File {
      * @param uuid A complete UUID string or a prefix of it
      * @return {@code true} if the UUID is found in the history file or {@code false} otherwise
      */
-    boolean checkById( String uuid ) {
-        findById(uuid) != null
+    boolean checkExistsById( String uuid ) {
+        listById(uuid)
     }
 
-    private String checkUnique(List<String> results) {
+    boolean checkExistsById( UUID uuid ) {
+        listById(uuid.toString())
+    }
+
+    boolean checkExistsByName( String name ) {
+        try {
+            return findByName(name) != null
+        }
+        catch( AbortOperationException e ) {
+            return false
+        }
+    }
+
+    private Entry checkUnique(List<Entry> results) {
         if( !results )
             return null
 
@@ -117,7 +127,7 @@ class HistoryFile extends File {
         }
 
         String message = 'Which session ID do you mean?\n'
-        results.each { message += '    ' + it + '\n' }
+        results.each { message += "    $it\n" }
         throw new AbortOperationException(message)
     }
 
@@ -127,14 +137,21 @@ class HistoryFile extends File {
      * @param name A name of a pipeline run
      * @return The session ID string associated to the `run` or {@code null} if it's not found
      */
-    String findByName(String name) {
+    Entry findByName(String name) {
         if( !exists() || empty() ) {
-            return Collections.emptyList()
+            return null
         }
 
-        def results = readLines().findResults {  String line ->
-            def cols = line.tokenize('\t')
-            cols.size()>2 && cols[1] == name ? cols[2] : null
+        def results = (List<Entry>)readLines().findResults {  String line ->
+            try {
+                def current = line ? Entry.parse(line) : null
+                if( current?.runName == name )
+                    return current
+            }
+            catch( IllegalArgumentException e ) {
+                log.debug e.message
+                return null
+            }
         }
 
         checkUnique(results)
@@ -146,20 +163,31 @@ class HistoryFile extends File {
      * @param id A session ID prefix
      * @return A complete session ID or {@code null} if the specified fragment is not found in the history
      */
-    String findById(String id) {
+    Entry findById(String id) {
+        def results = listById(id)
+        checkUnique(results)
+    }
+
+    @PackageScope
+    List<Entry> listById(String id) {
         if( !exists() || empty() ) {
             return null
         }
 
-        def results = this.readLines().findResults { String line ->
-            def cols = line.tokenize('\t')
-            if( cols.size() == 2 )
-                cols[0].startsWith(id) ? cols[0] : null
-            else
-                cols.size()>2 && cols[2].startsWith(id)? cols[2] : null
+        def results = (List<Entry>)this.readLines().findResults { String line ->
+            try {
+                def current = line ? Entry.parse(line) : null
+                if( current && current.sessionId.toString().startsWith(id) ) {
+                    return current
+                }
+            }
+            catch( IllegalArgumentException e ) {
+                log.debug e.message
+                return null
+            }
         }
 
-        checkUnique(results)
+        return results
     }
 
     /**
@@ -167,7 +195,7 @@ class HistoryFile extends File {
      * @param str
      * @return
      */
-    String findBy( String str ) {
+    Entry findBy( String str ) {
         if( str == 'last' )
             return findLast()
 
@@ -193,7 +221,6 @@ class HistoryFile extends File {
         return false
     }
 
-    @PackageScope
     static boolean isUuidString(String str) {
         for( int i=0; i<str.size(); i++ )
             if( !isUuidChar(str.charAt(i)))
@@ -201,25 +228,25 @@ class HistoryFile extends File {
         return true
     }
 
-    List<String> findAll() {
+    List<Entry> findAll() {
         if( !exists() || empty() ) {
             return Collections.emptyList()
         }
 
-        def results = []
-        this.eachLine {  String line ->
-            def cols = line.tokenize('\t')
-            if( cols.size() == 2 && !results.contains(cols[0] ))
-                results << cols[0]
-
-            else if( cols.size()>2 && !results.contains(cols[2]))
-                results << cols[2]
+        def results = this.readLines().findResults {  String line ->
+            try {
+                line ? Entry.parse(line) : null
+            }
+            catch( IllegalArgumentException e ) {
+                log.debug e.message
+                return null
+            }
         }
 
-        return results
+        return results.unique()
     }
 
-    List<String> findBefore(String nameOrId) {
+    List<Entry> findBefore(String nameOrId) {
         def sessionId = findBy(nameOrId)
         if( !sessionId )
             return Collections.emptyList()
@@ -236,7 +263,7 @@ class HistoryFile extends File {
         }
     }
 
-    List<String> findAfter(String nameOrId) {
+    List<Entry> findAfter(String nameOrId) {
         def sessionId = findBy(nameOrId)
         def firstMatch = false
 
@@ -250,7 +277,7 @@ class HistoryFile extends File {
         }
     }
 
-    List<String> findBut(String nameOrId) {
+    List<Entry> findBut(String nameOrId) {
         def sessionId = findBy(nameOrId)
         def result = findAll()
         result?.remove(sessionId)
@@ -266,4 +293,53 @@ class HistoryFile extends File {
         }
     }
 
+    def deleteEntry(Entry entry) {
+        def newHistory = new StringBuilder()
+
+        this.readLines().each { line ->
+            try {
+                def current = line ? Entry.parse(line) : null
+                if( current != entry ) {
+                    newHistory << line << '\n'
+                }
+            }
+            catch( IllegalArgumentException e ) {
+                log.debug e.message
+            }
+        }
+
+        // rewrite the history content
+        this.setText(newHistory.toString())
+    }
+
+    @EqualsAndHashCode
+    static class Entry {
+        UUID sessionId
+        String runName
+
+        Entry(String sessionId, String name=null) {
+            this.runName = name
+            this.sessionId = UUID.fromString(sessionId)
+        }
+
+        Entry(UUID sessionId, String name=null) {
+            this.runName = name
+            this.sessionId = sessionId
+        }
+
+        String toString() {
+            runName? "$runName -- $sessionId" : sessionId.toString()
+        }
+
+        static Entry parse(String line) {
+            def cols = line.tokenize('\t')
+            if( cols.size() == 2 )
+                return new Entry(cols[0])
+
+            if( cols.size()>2 )
+                return new Entry(cols[2], cols[1])
+
+            throw new IllegalArgumentException("Not a valid history entry: `$line`")
+        }
+    }
 }

@@ -19,6 +19,7 @@
  */
 
 package nextflow.util
+import static nextflow.util.HistoryFile.Entry
 
 import java.nio.file.Files
 
@@ -34,9 +35,9 @@ class HistoryFileTest extends Specification {
 b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sample.fa
 b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sample.fa -resume
 58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8\tnextflow run examples/basic.nf --in data/sample.fa
-2016-07-24 16:43:16\tevil_pike\te710da1b-ce06-482f-bbcf-987a507f85d1\t./launch.sh run hello
-2016-07-24 16:43:34\tgigantic_keller\t5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9\t./launch.sh run hello
-2016-07-25 09:58:01\tmodest_bartik\t5910a50f-8656-4765-aa79-f07cef912062\t./launch.sh run hello
+2016-07-24 16:43:16\tevil_pike\te710da1b-ce06-482f-bbcf-987a507f85d1\t.nextflow run hello
+2016-07-24 16:43:34\tgigantic_keller\t5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9\t.nextflow run hello
+2016-07-25 09:58:01\tmodest_bartik\t5910a50f-8656-4765-aa79-f07cef912062\t.nextflow run hello
 '''
 
     def 'test add and get and find' () {
@@ -59,11 +60,11 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         history.write( id3, 'slow_food', [1,2,3] )
 
         then:
-        history.findLast() == id3.toString()
-        history.checkById( id1.toString() )
-        history.checkById( id2.toString() )
-        history.checkById( id3.toString() )
-        !history.checkById( UUID.randomUUID().toString() )
+        history.findLast() == new Entry(id3,'slow_food')
+        history.checkExistsById( id1.toString() )
+        history.checkExistsById( id2.toString() )
+        history.checkExistsById( id3.toString() )
+        !history.checkExistsById( UUID.randomUUID().toString() )
 
     }
 
@@ -77,15 +78,15 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         when:
         def history = new HistoryFile(file)
         then:
-        history.findById('b8a3c4cf') == 'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'
-        history.findById('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98') == 'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'
-        history.findById('58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8') == '58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8'
-        history.findById('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9') == '5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9'
-        history.findById('5910a50f') == '5910a50f-8656-4765-aa79-f07cef912062'
+        history.findById('b8a3c4cf') == new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
+        history.findById('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98') ==  new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
+        history.findById('58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8') == new Entry('58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8')
+        history.findById('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9') == new Entry('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9','gigantic_keller')
+        history.findById('5910a50f') == new Entry('5910a50f-8656-4765-aa79-f07cef912062','modest_bartik')
         history.findById('5910a50x') == null
 
-        history.checkById('5910a50f')
-        !history.checkById('5910a50x')
+        history.checkExistsById('5910a50f')
+        !history.checkExistsById('5910a50x')
 
         when:
         history.findById('5')
@@ -107,8 +108,8 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         def history = new HistoryFile(file)
         then:
         history.findByName('lazy_pike') == null
-        history.findByName('evil_pike') == 'e710da1b-ce06-482f-bbcf-987a507f85d1'
-        history.findByName('gigantic_keller') == '5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9'
+        history.findByName('evil_pike') == new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike')
+        history.findByName('gigantic_keller') == new Entry('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9', 'gigantic_keller')
 
         cleanup:
         file?.delete()
@@ -147,9 +148,9 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
 
         expect:
         history.findBefore('5a6d3877') == [
-                'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98',
-                '58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8',
-                'e710da1b-ce06-482f-bbcf-987a507f85d1'
+                new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'),
+                new Entry('58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8'),
+                new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike')
         ]
 
         history.findBefore('unknown') == []
@@ -166,8 +167,8 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
 
         expect:
         history.findAfter('evil_pike') == [
-                '5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9',
-                '5910a50f-8656-4765-aa79-f07cef912062',
+                new Entry('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9', 'gigantic_keller'),
+                new Entry('5910a50f-8656-4765-aa79-f07cef912062', 'modest_bartik'),
         ]
 
 
@@ -185,11 +186,11 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
 
         expect:
         history.findAll() == [
-                'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98',
-                '58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8',
-                'e710da1b-ce06-482f-bbcf-987a507f85d1',
-                '5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9',
-                '5910a50f-8656-4765-aa79-f07cef912062'
+                new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'),
+                new Entry('58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8'),
+                new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike'),
+                new Entry('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9', 'gigantic_keller'),
+                new Entry('5910a50f-8656-4765-aa79-f07cef912062', 'modest_bartik')
         ]
     }
 
@@ -202,10 +203,58 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         def history = new HistoryFile(file)
 
         expect:
-        history.findBy('last') == '5910a50f-8656-4765-aa79-f07cef912062'
-        history.findBy('evil_pike') == 'e710da1b-ce06-482f-bbcf-987a507f85d1'
-        history.findBy('b8a3c4cf') == 'b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'
+        history.findBy('last') == new Entry('5910a50f-8656-4765-aa79-f07cef912062', 'modest_bartik')
+        history.findBy('evil_pike') == new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike')
+        history.findBy('b8a3c4cf') ==  new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
         history.findBy('unknown') == null
+    }
+
+    def 'should delete history entry ' () {
+
+        given:
+        def file = Files.createTempFile('test',null)
+        file.deleteOnExit()
+        file.text = FILE_TEXT
+        def history = new HistoryFile(file)
+
+        when:
+        history.deleteEntry( new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'))
+        history.deleteEntry( new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike') )
+        then:
+        history.text == '''
+                58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8\tnextflow run examples/basic.nf --in data/sample.fa
+                2016-07-24 16:43:34\tgigantic_keller\t5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9\t.nextflow run hello
+                2016-07-25 09:58:01\tmodest_bartik\t5910a50f-8656-4765-aa79-f07cef912062\t.nextflow run hello
+                '''
+                .stripIndent()
+    }
+
+    def 'should list entries by id ' () {
+
+        given:
+        def file = Files.createTempFile('test',null)
+        file.deleteOnExit()
+        file.text = FILE_TEXT
+        def history = new HistoryFile(file)
+
+        expect:
+        history.listById('b8a3c4cf') == [ new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'), new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')]
+        history.listById('e710da1b') == [ new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike') ]
+        history.listById('e710dadd') == []
+    }
+
+
+    def 'should return true when find an entry by name' () {
+
+        given:
+        def file = Files.createTempFile('test',null)
+        file.deleteOnExit()
+        file.text = FILE_TEXT
+        def history = new HistoryFile(file)
+
+        expect:
+        history.checkExistsByName('evil_pike')
+        !history.checkExistsByName('missing')
     }
 
 

@@ -564,12 +564,24 @@ class NameGenerator {
     private static Random RND = new Random()
 
     /**
-     * @return A random generated name string
-     */
+    * @return A random generated name string
+    */
     static String next() {
         def a = ADJECTIVES[ RND.nextInt(ADJECTIVES.size()) ]
         def b = NAMES[ RND.nextInt(NAMES.size()) ]
         return "${a}_${b}"
+    }
+
+    static String next(String... skip) {
+        next(skip as List<String>)
+    }
+
+    static String next(Collection<String> skip) {
+        while( true ) {
+            def result = next()
+            if( !skip.contains(skip) )
+                return result
+        }
     }
 
 }

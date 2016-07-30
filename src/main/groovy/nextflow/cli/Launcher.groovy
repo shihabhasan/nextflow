@@ -90,6 +90,7 @@ class Launcher implements ExitCode {
 
     protected void init() {
         allCommands = (List<CmdBase>)[
+                new CmdClean(),
                 new CmdClone(),
                 new CmdHistory(),
                 new CmdInfo(),

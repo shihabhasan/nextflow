@@ -53,8 +53,6 @@ import nextflow.trace.TraceObserver
 import nextflow.util.Barrier
 import nextflow.util.ConfigHelper
 import nextflow.util.Duration
-import nextflow.util.NameGenerator
-
 /**
  * Holds the information on the current execution
  *
@@ -234,7 +232,8 @@ class Session implements ISession {
         log.debug "Session uuid: $uniqueId"
 
         // -- set the run name
-        this.runName = config.runName ?: NameGenerator.next()
+        this.runName = config.runName
+        log.debug "Run name: $runName"
 
         // -- normalize taskConfig object
         if( config.process == null ) config.process = [:]
@@ -277,7 +276,7 @@ class Session implements ISession {
         this.observers = createObservers()
         this.statsEnabled = observers.size()>0
 
-        cache = new Cache(uniqueId).open()
+        cache = new Cache(uniqueId,runName).open()
     }
 
     /**
@@ -650,6 +649,9 @@ class Session implements ISession {
 
 
     void notifyTaskCached( TaskHandler handler ) {
+        // -- save a record in the cache index
+        cache.putTaskIndex(handler)
+
         for( TraceObserver it : observers ) {
             try {
                 it.onProcessCached(handler)

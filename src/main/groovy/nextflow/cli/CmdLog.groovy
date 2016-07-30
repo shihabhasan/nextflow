@@ -23,18 +23,16 @@ import java.nio.file.Path
 
 import ch.grengine.Grengine
 import com.beust.jcommander.Parameter
+import com.beust.jcommander.Parameters
 import groovy.text.Template
 import groovy.transform.CompileStatic
-import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
-import nextflow.Cache
 import nextflow.exception.AbortOperationException
 import nextflow.file.FileHelper
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskTemplateEngine
 import nextflow.trace.TraceRecord
 import nextflow.ui.TableBuilder
-import nextflow.util.HistoryFile
 /**
  * Implements the `log` command to print tasks runtime information of an execute pipeline
  *
@@ -42,15 +40,22 @@ import nextflow.util.HistoryFile
  */
 @Slf4j
 @CompileStatic
-class CmdLog extends CmdBase {
+@Parameters(commandDescription = "Print executions log and runtime info")
+class CmdLog extends CmdBase implements CacheBase {
 
-    static int MAX_LINES = 100
+    static private int MAX_LINES = 100
 
-    /**
-     * Only for testing purpose
-     */
-    @PackageScope
-    Path basePath
+    static private List<String> ALL_FIELDS
+
+    static {
+        ALL_FIELDS = []
+        ALL_FIELDS.addAll( TraceRecord.FIELDS.keySet() )
+        ALL_FIELDS << 'stdour'
+        ALL_FIELDS << 'stderr'
+        ALL_FIELDS << 'log'
+        ALL_FIELDS << 'env'
+        ALL_FIELDS.sort(true)
+    }
 
     static final NAME = 'log'
 
@@ -83,8 +88,6 @@ class CmdLog extends CmdBase {
 
     private Script filterScript
 
-    private HistoryFile history
-
     private boolean showHistory
 
     private Template templateScript
@@ -93,38 +96,27 @@ class CmdLog extends CmdBase {
     final String getName() { NAME }
 
 
-    private void validateOptions() {
+    void init() {
+        CacheBase.super.init()
 
-        if( !history ) {
-            history = !basePath ? HistoryFile.DEFAULT : new HistoryFile(basePath.resolve(HistoryFile.FILE_NAME))
-        }
-
-        if( !history.exists() || history.empty() )
-            throw new AbortOperationException("It looks no pipeline was executed in this folder (or execution history has been deleted)")
-
+        //
+        // validate input options
+        //
         if( fields && templateStr )
             throw new AbortOperationException("Options `fields` and `template` cannot be used in the same command")
 
-        if( after && before )
-            throw new AbortOperationException("Options `after` and `before` cannot be used in the same command")
-
-        if( after && but )
-            throw new AbortOperationException("Options `after` and `but` cannot be used in the same command")
-
-        if( before && but )
-            throw new AbortOperationException("Options `before` and `but` cannot be used in the same command")
+//        if( (fields || templateStr) && !args )
+//            throw new AbortOperationException("You need to specify a run name or session id")
 
         showHistory = !args && !before && !after && !but
-    }
 
-    private void initialize() {
-
-        // -- initialize the filter engine
+        //
+        // initialise template engine and filters
+        //
         if( filterStr ) {
             filterScript = new Grengine().create("{ it -> $filterStr }")
         }
 
-        // -- initialize the template engine
         if( !templateStr ) {
             templateStr = fields.tokenize(',  \n').collect { '$'+it } .join(sep)
         }
@@ -135,36 +127,16 @@ class CmdLog extends CmdBase {
         templateScript = new TaskTemplateEngine().createTemplate(templateStr)
     }
 
-    private List<String> listIds() {
-
-        if( but ) {
-            return history.findBut(but)
-        }
-
-        if( before ) {
-            return history.findBefore(before)
-        }
-
-        else if( after ) {
-            return history.findBefore(after)
-        }
-
-        // -- get the session ID from the command line if specified or retrieve from
-        def sessionId = history.findBy(args ? args[0] : 'last')
-        sessionId ? [sessionId] : Collections.<String>emptyList()
-    }
-
     /**
      * Implements the `log` command
      */
     @Override
     void run() {
-        validateOptions()
-        initialize()
+        init()
 
         // -- show the list of expected fields and exit
         if( listFields ) {
-            TraceRecord.FIELDS.keySet().sort().each { println "  $it" }
+            ALL_FIELDS.each { println "  $it" }
             return
         }
 
@@ -175,30 +147,16 @@ class CmdLog extends CmdBase {
         }
 
         // -- main
-        listIds().each { uuid ->
+        listIds().each { entry ->
 
             // -- go
-            cacheFor(uuid)
+            cacheFor(entry)
                         .openForRead()
                         .eachRecord(this.&printRecord)
                         .close()
 
         }
 
-    }
-
-    private Cache cacheFor(String sessionId) {
-
-        // -- convert the session ID string to a UUID
-        def uuid
-        try {
-            uuid = UUID.fromString(sessionId)
-        }
-        catch( IllegalArgumentException e ) {
-            throw new AbortOperationException("Not a valid nextflow session ID: $sessionId -- It must be 128-bit UUID formatted string", e)
-        }
-
-        !basePath ? new Cache(uuid) : new Cache(uuid,basePath)
     }
 
     /**
@@ -295,7 +253,7 @@ class CmdLog extends CmdBase {
         }
 
         private Path getWorkDir() {
-            def folder = (String)record.get('folder')
+            def folder = (String)record.get(TraceRecord.FOLDER)
             folder ? FileHelper.asPath(folder) : null
         }
 

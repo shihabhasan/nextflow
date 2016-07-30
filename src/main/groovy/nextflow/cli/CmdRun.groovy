@@ -35,6 +35,9 @@ import nextflow.script.ScriptRunner
 import nextflow.util.ConfigHelper
 import nextflow.util.CustomPoolFactory
 import nextflow.util.Duration
+import nextflow.util.HistoryFile
+import nextflow.util.NameGenerator
+
 /**
  * CLI sub-command RUN
  *
@@ -168,6 +171,7 @@ class CmdRun extends CmdBase implements HubOptions {
         if( withDocker && withoutDocker )
             throw new AbortOperationException("Command line options `-with-docker` and `-without-docker` cannot be specified at the same time")
 
+        checkRunName()
 
         log.info "N E X T F L O W  ~  version ${Const.APP_VER}"
 
@@ -196,13 +200,25 @@ class CmdRun extends CmdBase implements HubOptions {
             log.debug( '\n'+info )
 
             // -- add this run to the local history
-            runner.verifyAndTrackHistory(launcher.cliString, runner.session.runName)
+            runner.verifyAndTrackHistory(launcher.cliString, runName)
 
             // -- run it!
             runner.execute(scriptArgs)
         }
     }
 
+    private void checkRunName() {
+        if( runName == 'last' )
+            throw new AbortOperationException("Not a valid run name: `last`")
+
+        if( !runName ) {
+            // -- make sure the generated name does not exist already
+            runName = NameGenerator.next( HistoryFile.DEFAULT.findAll().findResults{ it.runName } )
+        }
+
+        else if( HistoryFile.DEFAULT.checkExistsByName(runName) )
+            throw new AbortOperationException("Run name `$runName` has been already used -- Specify a different one")
+    }
 
     protected ScriptFile getScriptFile(String pipelineName) {
         assert pipelineName
@@ -232,7 +248,7 @@ class CmdRun extends CmdBase implements HubOptions {
         if( script.exists() ) {
             if( revision )
                 throw new AbortOperationException("Revision option cannot be used running a script")
-            log.info "Launching $script"
+            log.info "Launching $script [$runName]"
             return new ScriptFile(script)
         }
 
@@ -253,7 +269,7 @@ class CmdRun extends CmdBase implements HubOptions {
             manager.checkout(revision)
             manager.updateModules()
             def scriptFile = manager.getScriptFile()
-            log.info "Launching '${repo}' - revision: ${scriptFile.revisionInfo}"
+            log.info "Launching '$repo' [$runName] - revision: ${scriptFile.revisionInfo}"
             // return the script file
             return scriptFile
         }

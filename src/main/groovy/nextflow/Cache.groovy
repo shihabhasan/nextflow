@@ -26,12 +26,14 @@ import com.google.common.hash.HashCode
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import groovyx.gpars.agent.Agent
+import nextflow.exception.AbortOperationException
 import nextflow.processor.TaskContext
 import nextflow.processor.TaskEntry
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
 import nextflow.trace.TraceRecord
 import nextflow.util.CacheHelper
+import nextflow.util.HistoryFile.Entry
 import nextflow.util.KryoHelper
 import org.iq80.leveldb.DB
 import org.iq80.leveldb.Options
@@ -49,27 +51,34 @@ class Cache implements Closeable {
 
     private UUID uniqueId
 
+    private String runName
+
     private Path baseDir
 
     private Path dataDir
 
     private Agent writer
 
-    private RandomAccessFile index
+    private Path indexFile
+
+    private RandomAccessFile indexHandle
 
     private final int KEY_SIZE
 
-
-    Cache(UUID uniqueId) {
-        this(uniqueId, Paths.get('.'))
+    Cache(Entry entry, Path home=null) {
+        this(entry.sessionId, entry.runName, home)
     }
 
     /** Only for test purpose */
-    Cache(UUID uniqueId, Path home) {
+    Cache(UUID uniqueId, String runName, Path home=null) {
+        if( !uniqueId ) throw new AbortOperationException("Missing cache `uuid`")
+        if( !runName ) throw new AbortOperationException("Missing cache `runName`")
         this.KEY_SIZE = CacheHelper.hasher('x').hash().asBytes().size()
         this.uniqueId = uniqueId
-        this.baseDir = home
-        this.dataDir = baseDir.resolve(".cache/${uniqueId.toString()}")
+        this.runName = runName
+        this.baseDir = home ?: Paths.get('.').toAbsolutePath()
+        this.dataDir = baseDir.resolve(".cache/$uniqueId")
+        this.indexFile = dataDir.resolve("index.$runName")
         this.writer = new Agent()
     }
 
@@ -87,15 +96,16 @@ class Cache implements Closeable {
      */
     Cache open() {
         openDb()
-        def file = dataDir.resolve('index').toFile(); file.delete()
-        index = new RandomAccessFile(file, 'rw')
+        indexFile.delete()
+        indexHandle = new RandomAccessFile(indexFile.toFile(), 'rw')
         return this
     }
 
     Cache openForRead() {
         openDb()
-        def file = dataDir.resolve('index').toFile()
-        index = new RandomAccessFile(file, 'r')
+        if( !indexFile.exists() )
+            throw new AbortOperationException("Missing cache index file: $indexFile")
+        indexHandle = new RandomAccessFile(indexFile.toFile(), 'r')
         return this
     }
 
@@ -148,14 +158,27 @@ class Cache implements Closeable {
     }
 
     void putTaskIndex( TaskHandler handler ) {
-        writer.send { index.write(handler.task.hash.asBytes()) }
+        writer.send { indexHandle.write(handler.task.hash.asBytes()) }
+    }
+
+    void removeTaskEntry( HashCode hash ) {
+        final key = hash.asBytes()
+        db.delete(key)
+    }
+
+    void dropIndex( ) {
+        indexFile.delete()
+    }
+
+    void drop() {
+        dataDir.deleteDir()
     }
 
     Cache eachRecord( Closure closure ) {
         assert closure
 
         def key = new byte[KEY_SIZE]
-        while( index.read(key) != -1) {
+        while( indexHandle.read(key) != -1) {
 
             final payload = (byte[])db.get(key)
             if( !payload ) {
@@ -166,13 +189,20 @@ class Cache implements Closeable {
             final record = (List<byte[]>)KryoHelper.deserialize(payload)
             TraceRecord trace = TraceRecord.deserialize(record[0])
 
-            if( closure.maximumNumberOfParameters==2 )
+            if( closure.maximumNumberOfParameters==2 ) {
                 closure.call(HashCode.fromBytes(key), trace)
-            else
+            }
+            else {
                 closure.call(trace)
+            }
+
         }
 
         return this
+    }
+
+    boolean isEmpty() {
+        !db.iterator().hasNext()
     }
 
     /**
@@ -181,7 +211,7 @@ class Cache implements Closeable {
     @Override
     void close() {
         writer.await()
-        index.closeQuietly()
+        indexHandle?.closeQuietly()
         db.closeQuietly()
     }
 }
