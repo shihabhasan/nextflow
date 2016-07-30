@@ -73,6 +73,7 @@ class Cache implements Closeable {
     Cache(UUID uniqueId, String runName, Path home=null) {
         if( !uniqueId ) throw new AbortOperationException("Missing cache `uuid`")
         if( !runName ) throw new AbortOperationException("Missing cache `runName`")
+
         this.KEY_SIZE = CacheHelper.hasher('x').hash().asBytes().size()
         this.uniqueId = uniqueId
         this.runName = runName
@@ -129,6 +130,39 @@ class Cache implements Closeable {
         return new TaskEntry(trace,ctx)
     }
 
+    void incTaskEntry( HashCode hash ) {
+        final key = hash.asBytes()
+        def payload = db.get(key)
+        if( !payload ) {
+            log.debug "Can't increment reference for cached task with key: $hash"
+            return
+        }
+
+        final record = (List)KryoHelper.deserialize(payload)
+        // third record contains the reference count for this record
+        record[2] = ((Integer)record[2]) +1
+        // save it again
+        db.put(key, KryoHelper.serialize(record))
+
+    }
+
+    void decTaskEntry( HashCode hash ) {
+        final key = hash.asBytes()
+        def payload = db.get(key)
+        if( !payload ) {
+            log.debug "Can't increment reference for cached task with key: $hash"
+            return
+        }
+
+        final record = (List)KryoHelper.deserialize(payload)
+        // third record contains the reference count for this record
+        def count = (record[2] as Integer) --
+        // save or delete
+        count > 0 ? db.put(key, KryoHelper.serialize(record)) : db.delete(key)
+    }
+
+
+
     /**
      * Save task runtime information to th cache DB
      *
@@ -145,12 +179,13 @@ class Cache implements Closeable {
         // only the 'cache' is active and
         TaskContext ctx = proc.isCacheable() && task.hasCacheableValues() ? task.context : null
 
-        def entry = new ArrayList(2)
-        entry.add( trace.serialize() )
-        entry.add( ctx != null ? ctx.serialize() : null )
+        def record = new ArrayList(3)
+        record[0] = trace.serialize()
+        record[1] = ctx != null ? ctx.serialize() : null
+        record[2] = 1
 
         // -- save in the db
-        db.put( key, KryoHelper.serialize(entry) )
+        db.put( key, KryoHelper.serialize(record) )
     }
 
     void putTaskAsync( TaskHandler handler ) {
@@ -161,7 +196,7 @@ class Cache implements Closeable {
         writer.send { indexHandle.write(handler.task.hash.asBytes()) }
     }
 
-    void removeTaskEntry( HashCode hash ) {
+    void deleteTaskEntry( HashCode hash ) {
         final key = hash.asBytes()
         db.delete(key)
     }
@@ -188,13 +223,20 @@ class Cache implements Closeable {
 
             final record = (List<byte[]>)KryoHelper.deserialize(payload)
             TraceRecord trace = TraceRecord.deserialize(record[0])
+            final refCount = record[2] as Integer
 
-            if( closure.maximumNumberOfParameters==2 ) {
-                closure.call(HashCode.fromBytes(key), trace)
-            }
-            else {
+            final len=closure.maximumNumberOfParameters
+            if( len==1 )
                 closure.call(trace)
-            }
+
+            else if( len==2 )
+                closure.call(HashCode.fromBytes(key), trace)
+
+            else if( len==3 )
+                closure.call(HashCode.fromBytes(key), trace, refCount)
+
+            else
+                throw new IllegalArgumentException("Invalid closure signature -- Too many parameters")
 
         }
 

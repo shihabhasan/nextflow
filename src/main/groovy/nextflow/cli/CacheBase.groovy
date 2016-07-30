@@ -58,7 +58,7 @@ trait CacheBase {
         }
 
         if( !history.exists() || history.empty() )
-            throw new AbortOperationException("It looks no pipeline was executed in this folder (or execution history has been deleted)")
+            throw new AbortOperationException("It looks no pipeline was executed in this folder (or execution history is empty)")
 
         if( after && before )
             throw new AbortOperationException("Options `after` and `before` cannot be used in the same command")
@@ -72,7 +72,6 @@ trait CacheBase {
     }
 
     Cache cacheFor(Entry entry) {
-
         new Cache(entry,basePath)
     }
 
@@ -91,8 +90,7 @@ trait CacheBase {
         }
 
         // -- get the session ID from the command line if specified or retrieve from
-        def entry = history.findBy(args ? args[0] : 'last')
-        (List<Entry>)(entry ? [entry] : Collections.emptyList())
+        history.findByIdOrName(args ? args[0] : 'last')
     }
 
 

@@ -111,22 +111,48 @@ class CmdClean extends CmdBase implements CacheBase {
 
     }
 
-   private void removeRecord(HashCode hash, TraceRecord record) {
+
+    private Map<HashCode, Integer> dryHash = new HashMap<>()
+
+    private boolean wouldRemove(HashCode hash, Integer refCount) {
+
+        if( dryHash.containsKey(hash) ) {
+            refCount = dryHash.get(hash)-1
+        }
+
+
+        if( refCount == 1 ) {
+            dryHash.remove(hash)
+            return true
+        }
+        else {
+            dryHash.put(hash, refCount)
+            return false
+        }
+
+    }
+
+    private void removeRecord(HashCode hash, TraceRecord record, int refCount) {
         if( dryRun ) {
-            println "World remove ${record.workDir}"
+            if( wouldRemove(hash,refCount) )
+                println "World remove ${record.workDir}"
+            return
+        }
+
+        if( refCount > 1 ) {
+            // don't remove it because it's referenced by another run instance
             return
         }
 
         try {
-            def folder = FileHelper.asPath(record.workDir)
-
             // delete folder
+            def folder = FileHelper.asPath(record.workDir)
             folder.deleteDir()
             if( !quiet )
                 println "Removed ${record.workDir}"
 
-            // remove the entry in the db
-            currentCache.removeTaskEntry(hash)
+            // decrement the ref count in the db
+            currentCache.decTaskEntry(hash)
         }
         catch(IOException e) {
             log.warn "Unable to delete: ${record.workDir} -- Cause: ${e.message ?: e}"

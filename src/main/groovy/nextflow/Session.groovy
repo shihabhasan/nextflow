@@ -651,6 +651,7 @@ class Session implements ISession {
     void notifyTaskCached( TaskHandler handler ) {
         // -- save a record in the cache index
         cache.putTaskIndex(handler)
+        cache.incTaskEntry(handler.task.hash)
 
         for( TraceObserver it : observers ) {
             try {

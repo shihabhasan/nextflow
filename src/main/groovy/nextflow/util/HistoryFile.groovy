@@ -67,15 +67,14 @@ class HistoryFile extends File {
         this << "${now}\t${name}\t${key.toString()}\t${value}\n"
     }
 
-    Entry findLast() {
+    Entry getLast() {
         if( !exists() || empty() ) {
             return null
         }
 
-        def lines = readLines()
-        def lastLine = lines.get(lines.size()-1)
+        def line = readLines()[-1]
         try {
-            lastLine ? Entry.parse(lastLine) : null
+            line ? Entry.parse(line) : null
         }
         catch( IllegalArgumentException e ) {
             log.debug e.message
@@ -101,16 +100,16 @@ class HistoryFile extends File {
      * @return {@code true} if the UUID is found in the history file or {@code false} otherwise
      */
     boolean checkExistsById( String uuid ) {
-        listById(uuid)
+        findById(uuid)
     }
 
     boolean checkExistsById( UUID uuid ) {
-        listById(uuid.toString())
+        findById(uuid.toString())
     }
 
     boolean checkExistsByName( String name ) {
         try {
-            return findByName(name) != null
+            return getByName(name) != null
         }
         catch( AbortOperationException e ) {
             return false
@@ -137,7 +136,7 @@ class HistoryFile extends File {
      * @param name A name of a pipeline run
      * @return The session ID string associated to the `run` or {@code null} if it's not found
      */
-    Entry findByName(String name) {
+    Entry getByName(String name) {
         if( !exists() || empty() ) {
             return null
         }
@@ -163,13 +162,12 @@ class HistoryFile extends File {
      * @param id A session ID prefix
      * @return A complete session ID or {@code null} if the specified fragment is not found in the history
      */
-    Entry findById(String id) {
-        def results = listById(id)
+    Entry getById(String id) {
+        def results = findById(id)
         checkUnique(results)
     }
 
-    @PackageScope
-    List<Entry> listById(String id) {
+    List<Entry> findById(String id) {
         if( !exists() || empty() ) {
             return null
         }
@@ -195,14 +193,24 @@ class HistoryFile extends File {
      * @param str
      * @return
      */
-    Entry findBy( String str ) {
+    Entry getByIdOrName( String str ) {
         if( str == 'last' )
-            return findLast()
+            return getLast()
+
+        if( isUuidString(str) )
+            return getById(str)
+
+        getByName(str)
+    }
+
+    List<Entry> findByIdOrName( String str ) {
+        if( str == 'last' )
+            return [getLast()]
 
         if( isUuidString(str) )
             return findById(str)
 
-        findByName(str)
+        return [getByName(str)]
     }
 
     @PackageScope
@@ -246,15 +254,15 @@ class HistoryFile extends File {
         return results.unique()
     }
 
-    List<Entry> findBefore(String nameOrId) {
-        def sessionId = findBy(nameOrId)
-        if( !sessionId )
+    List<Entry> findBefore(String idOrName) {
+        def matching = findByIdOrName(idOrName)
+        if( !matching )
             return Collections.emptyList()
 
         def firstMatch = false
 
         return findAll().findResults {
-            if( it==sessionId ) {
+            if( it==matching[0] ) {
                 firstMatch = true
                 return null
             }
@@ -263,12 +271,14 @@ class HistoryFile extends File {
         }
     }
 
-    List<Entry> findAfter(String nameOrId) {
-        def sessionId = findBy(nameOrId)
-        def firstMatch = false
+    List<Entry> findAfter(String idOrName) {
+        def matching = findByIdOrName(idOrName)
+        if( !matching )
+            return Collections.emptyList()
 
+        def firstMatch = false
         return findAll().findResults {
-            if( it==sessionId ) {
+            if( it==matching[-1] ) {
                 firstMatch = true
                 return null
             }
@@ -277,10 +287,10 @@ class HistoryFile extends File {
         }
     }
 
-    List<Entry> findBut(String nameOrId) {
-        def sessionId = findBy(nameOrId)
-        def result = findAll()
-        result?.remove(sessionId)
+    List<Entry> findBut(String idOrName) {
+        final matching = findByIdOrName(idOrName)
+        final result = findAll()
+        result.removeAll(matching)
         return result
     }
 
@@ -328,7 +338,7 @@ class HistoryFile extends File {
         }
 
         String toString() {
-            runName? "$runName -- $sessionId" : sessionId.toString()
+            runName? "$sessionId -- $runName" : sessionId.toString()
         }
 
         static Entry parse(String line) {

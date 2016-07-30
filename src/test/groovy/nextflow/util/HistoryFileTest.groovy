@@ -49,7 +49,7 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         when:
         def history = new HistoryFile(file)
         then:
-        history.findLast() == null
+        history.getLast() == null
 
         when:
         def id1 = UUID.randomUUID()
@@ -60,7 +60,7 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         history.write( id3, 'slow_food', [1,2,3] )
 
         then:
-        history.findLast() == new Entry(id3,'slow_food')
+        history.getLast() == new Entry(id3,'slow_food')
         history.checkExistsById( id1.toString() )
         history.checkExistsById( id2.toString() )
         history.checkExistsById( id3.toString() )
@@ -78,18 +78,18 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         when:
         def history = new HistoryFile(file)
         then:
-        history.findById('b8a3c4cf') == new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
-        history.findById('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98') ==  new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
-        history.findById('58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8') == new Entry('58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8')
-        history.findById('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9') == new Entry('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9','gigantic_keller')
-        history.findById('5910a50f') == new Entry('5910a50f-8656-4765-aa79-f07cef912062','modest_bartik')
-        history.findById('5910a50x') == null
+        history.getById('b8a3c4cf') == new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
+        history.getById('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98') ==  new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
+        history.getById('58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8') == new Entry('58d8dd16-ce77-4507-ba1a-ec1ccc9bd2e8')
+        history.getById('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9') == new Entry('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9','gigantic_keller')
+        history.getById('5910a50f') == new Entry('5910a50f-8656-4765-aa79-f07cef912062','modest_bartik')
+        history.getById('5910a50x') == null
 
         history.checkExistsById('5910a50f')
         !history.checkExistsById('5910a50x')
 
         when:
-        history.findById('5')
+        history.getById('5')
         then:
         thrown(AbortOperationException)
 
@@ -107,9 +107,9 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         when:
         def history = new HistoryFile(file)
         then:
-        history.findByName('lazy_pike') == null
-        history.findByName('evil_pike') == new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike')
-        history.findByName('gigantic_keller') == new Entry('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9', 'gigantic_keller')
+        history.getByName('lazy_pike') == null
+        history.getByName('evil_pike') == new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike')
+        history.getByName('gigantic_keller') == new Entry('5a6d3877-8823-4ed6-b7fe-2b6748ed4ff9', 'gigantic_keller')
 
         cleanup:
         file?.delete()
@@ -203,10 +203,10 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         def history = new HistoryFile(file)
 
         expect:
-        history.findBy('last') == new Entry('5910a50f-8656-4765-aa79-f07cef912062', 'modest_bartik')
-        history.findBy('evil_pike') == new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike')
-        history.findBy('b8a3c4cf') ==  new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
-        history.findBy('unknown') == null
+        history.getByIdOrName('last') == new Entry('5910a50f-8656-4765-aa79-f07cef912062', 'modest_bartik')
+        history.getByIdOrName('evil_pike') == new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike')
+        history.getByIdOrName('b8a3c4cf') ==  new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')
+        history.getByIdOrName('unknown') == null
     }
 
     def 'should delete history entry ' () {
@@ -238,9 +238,9 @@ b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98\tnextflow run examples/ampa.nf --in data/sa
         def history = new HistoryFile(file)
 
         expect:
-        history.listById('b8a3c4cf') == [ new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'), new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')]
-        history.listById('e710da1b') == [ new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike') ]
-        history.listById('e710dadd') == []
+        history.findById('b8a3c4cf') == [ new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98'), new Entry('b8a3c4cf-17e4-49c6-a4cf-4fd8ddbeef98')]
+        history.findById('e710da1b') == [ new Entry('e710da1b-ce06-482f-bbcf-987a507f85d1', 'evil_pike') ]
+        history.findById('e710dadd') == []
     }
 
 

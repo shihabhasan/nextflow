@@ -24,6 +24,7 @@ import java.nio.file.Path
 import ch.grengine.Grengine
 import com.beust.jcommander.Parameter
 import com.beust.jcommander.Parameters
+import com.google.common.hash.HashCode
 import groovy.text.Template
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
@@ -159,12 +160,20 @@ class CmdLog extends CmdBase implements CacheBase {
 
     }
 
+    private Map<HashCode,Boolean> printed = new HashMap<>()
+
     /**
      * Print a log {@link TraceRecord} the the standard output by using the specified {@link #templateStr}
      *
      * @param record A {@link TraceRecord} instance representing a task runtime information
      */
-    protected void printRecord(TraceRecord record) {
+    protected void printRecord(HashCode hash, TraceRecord record) {
+
+        if( printed.containsKey(hash) )
+            return
+        else
+            printed.put(hash,Boolean.TRUE)
+
 
         final adaptor = new TraceAdaptor(record)
 
