@@ -20,6 +20,12 @@
 
 package nextflow.cli
 
+import java.nio.file.FileVisitResult
+import java.nio.file.FileVisitor
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
+
 import com.beust.jcommander.Parameter
 import com.beust.jcommander.Parameters
 import com.google.common.hash.HashCode
@@ -119,7 +125,6 @@ class CmdClean extends CmdBase implements CacheBase {
             refCount = dryHash.get(hash)-1
         }
 
-
         if( refCount == 1 ) {
             dryHash.remove(hash)
             return true
@@ -138,22 +143,16 @@ class CmdClean extends CmdBase implements CacheBase {
             return
         }
 
-        if( refCount > 1 ) {
-            // don't remove it because it's referenced by another run instance
-            if( !quiet )
-                println "Won't remove ${record.workDir}"
-            return
-        }
-
         try {
-            // delete folder
-            def folder = FileHelper.asPath(record.workDir)
-            folder.deleteDir()
-            if( !quiet )
-                println "Removed ${record.workDir}"
-
             // decrement the ref count in the db
-            currentCacheDb.decTaskEntry(hash)
+            def deleted = currentCacheDb.removeTaskEntry(hash)
+            if( deleted ) {
+                // delete folder
+                if( deleteFolder(FileHelper.asPath(record.workDir))) {
+                    if(!quiet) println "Removed ${record.workDir}"
+                }
+
+            }
         }
         catch(IOException e) {
             log.warn "Unable to delete: ${record.workDir} -- Cause: ${e.message ?: e}"
@@ -163,6 +162,45 @@ class CmdClean extends CmdBase implements CacheBase {
         }
 
 
+    }
+
+    private boolean deleteFolder( Path folder ) {
+
+        def result = true
+        Files.walkFileTree(folder, new FileVisitor<Path>() {
+
+            @Override
+            FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                result ? FileVisitResult.CONTINUE : FileVisitResult.TERMINATE
+            }
+
+            @Override
+            FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                if( !file.delete() ) {
+                    result = false
+                    if(!quiet) System.err.println "Failed to remove $file"
+                }
+
+                result ? FileVisitResult.CONTINUE : FileVisitResult.TERMINATE
+            }
+
+            @Override
+            FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+                FileVisitResult.CONTINUE
+            }
+
+            @Override
+            FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                if( result && !dir.delete() ) {
+                    result = false
+                    if(!quiet) System.err.println "Failed to remove $dir"
+                }
+
+                result ? FileVisitResult.CONTINUE : FileVisitResult.TERMINATE
+            }
+        })
+
+        return result
     }
 
 }

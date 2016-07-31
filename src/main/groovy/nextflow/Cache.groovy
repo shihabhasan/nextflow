@@ -158,7 +158,7 @@ class Cache implements Closeable {
 
     }
 
-    void decTaskEntry( HashCode hash ) {
+    boolean removeTaskEntry( HashCode hash ) {
         final key = hash.asBytes()
         def payload = db.get(key)
         if( !payload ) {
@@ -168,9 +168,16 @@ class Cache implements Closeable {
 
         final record = (List)KryoHelper.deserialize(payload)
         // third record contains the reference count for this record
-        def count = (record[2] as Integer) --
+        def count = record[2] = ((Integer)record[2]) -1
         // save or delete
-        count > 0 ? db.put(key, KryoHelper.serialize(record)) : db.delete(key)
+        if( count > 0 ) {
+            db.put(key, KryoHelper.serialize(record))
+            return false
+        }
+        else {
+            db.delete(key)
+            return true
+        }
     }
 
 
@@ -276,12 +283,12 @@ class Cache implements Closeable {
     }
 
     /**
-     * Close the underlying database
+     * Close the underlying database and index file
      */
     @Override
     void close() {
         writer.await()
-        indexHandle?.closeQuietly()
+        indexHandle.closeQuietly()
         db.closeQuietly()
     }
 }
