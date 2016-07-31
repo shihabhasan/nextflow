@@ -36,7 +36,7 @@ import spock.lang.Specification
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
-class CacheTest extends Specification {
+class CacheDBTest extends Specification {
 
 
     def 'should save and read a task entry in the cache db' () {
@@ -47,7 +47,7 @@ class CacheTest extends Specification {
         def hash = CacheHelper.hasher('x').hash()
 
         // -- the session object
-        def cache = new Cache(uuid, folder)
+        def cache = new CacheDB(uuid, folder)
 
         // -- the processor mock
         def proc = Mock(TaskProcessor)
@@ -131,7 +131,7 @@ class CacheTest extends Specification {
         def hash3 = CacheHelper.hasher('x').hash()
 
         when:
-        def cache = new Cache(uuid, folder).open()
+        def cache = new CacheDB(uuid, folder).open()
 
         def h1 = makeTaskHandler(hash1, [task_id: 1, process: 'foo', exit: 0])
         cache.putTaskEntry(h1)

@@ -21,7 +21,7 @@
 package nextflow.cli
 import java.nio.file.Files
 
-import nextflow.Cache
+import nextflow.CacheDB
 import nextflow.executor.CachedTaskHandler
 import nextflow.processor.ProcessConfig
 import nextflow.processor.TaskContext
@@ -53,7 +53,7 @@ class CmdLogTest extends Specification {
         def uuid = UUID.randomUUID()
 
         // -- the session object
-        def cache = new Cache(uuid, folder)
+        def cache = new CacheDB(uuid, folder)
 
         // -- the processor mock
         def proc = Mock(TaskProcessor)
@@ -110,7 +110,7 @@ class CmdLogTest extends Specification {
         def uuid = UUID.randomUUID()
 
         // -- the session object
-        def cache = new Cache(uuid, folder)
+        def cache = new CacheDB(uuid, folder)
 
         // -- the processor mock
         def proc = Mock(TaskProcessor)

@@ -19,7 +19,6 @@
  */
 
 package nextflow.cli
-
 import java.nio.file.FileVisitResult
 import java.nio.file.FileVisitor
 import java.nio.file.Files
@@ -31,13 +30,14 @@ import com.beust.jcommander.Parameters
 import com.google.common.hash.HashCode
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import nextflow.Cache
+import nextflow.CacheDB
 import nextflow.exception.AbortOperationException
 import nextflow.file.FileHelper
 import nextflow.trace.TraceRecord
 import nextflow.util.HistoryFile.Entry
-import org.iq80.leveldb.DBException
+
 /**
+ * Implements cache clean up command
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
@@ -69,11 +69,13 @@ class CmdClean extends CmdBase implements CacheBase {
     @Parameter
     List<String> args
 
-    private Cache currentCacheDb
+    private CacheDB currentCacheDb
 
     private Map<HashCode, Short> dryHash = new HashMap<>()
 
-
+    /**
+     * @return The name of this command {@code clean}
+     */
     @Override
     String getName() {
         return NAME
@@ -87,18 +89,27 @@ class CmdClean extends CmdBase implements CacheBase {
         init()
         validateOptions()
 
-        listIds().each { entry -> cleanupCache(entry)}
+        listIds().each { entry -> cleanup(entry)}
 
     }
 
+    /**
+     * Extra CLI option validation
+     */
     private void validateOptions() {
 
         if( !dryRun && !force )
             throw new AbortOperationException("Neither -f or -n specified -- refused to clean")
     }
 
-
-    private void cleanupCache(Entry entry) {
+    /**
+     * Given a history entry clean up execution cache, deleting
+     * task work directories and cache DB records
+     *
+     * @param entry
+     *      A {@link Entry} object representing a row in the history log file
+     */
+    private void cleanup(Entry entry) {
         currentCacheDb = cacheFor(entry).openForRead()
         // -- remove each entry and work dir
         currentCacheDb.eachRecord(this.&removeRecord)
@@ -109,16 +120,26 @@ class CmdClean extends CmdBase implements CacheBase {
         if( dryRun ) return
 
         // -- remove the index file
-        currentCacheDb.dropIndex()
+        currentCacheDb.deleteIndex()
         // -- remove the session from the history file
         history.deleteEntry(entry)
         // -- check if exists another history entry for the same session
         if( !history.checkExistsById(entry.sessionId)) {
             currentCacheDb.drop()
         }
-
     }
 
+    /**
+     * Check if a tasks can be removed during a dry-run simulation.
+     *
+     * @param hash
+     *      The task unique hash code
+     * @param refCount
+     *      The number of times the task cache is references by other run instances
+     * @return
+     *      {@code true} when task will be removed by the clean command, {@code false} otherwise i.e.
+     *      entry cannot be deleted because is referenced by other run instances
+     */
     private boolean wouldRemove(HashCode hash, Integer refCount) {
 
         if( dryHash.containsKey(hash) ) {
@@ -136,6 +157,13 @@ class CmdClean extends CmdBase implements CacheBase {
 
     }
 
+    /**
+     * Delete task cache entry
+     *
+     * @param hash The task unique hash code
+     * @param record The task {@link TraceRecord}
+     * @param refCount The number of times the task cache is references by other run instances
+     */
     private void removeRecord(HashCode hash, TraceRecord record, int refCount) {
         if( dryRun ) {
             if( wouldRemove(hash,refCount) )
@@ -143,27 +171,24 @@ class CmdClean extends CmdBase implements CacheBase {
             return
         }
 
-        try {
-            // decrement the ref count in the db
-            def deleted = currentCacheDb.removeTaskEntry(hash)
-            if( deleted ) {
-                // delete folder
-                if( deleteFolder(FileHelper.asPath(record.workDir))) {
-                    if(!quiet) println "Removed ${record.workDir}"
-                }
-
+        // decrement the ref count in the db
+        def deleted = currentCacheDb.removeTaskEntry(hash)
+        if( deleted ) {
+            // delete folder
+            if( deleteFolder(FileHelper.asPath(record.workDir))) {
+                if(!quiet) println "Removed ${record.workDir}"
             }
         }
-        catch(IOException e) {
-            log.warn "Unable to delete: ${record.workDir} -- Cause: ${e.message ?: e}"
-        }
-        catch( DBException e ) {
-            log.debug "Failed to remove entry from cache db: $hash -- Cause: ${e.message ?: e}"
-        }
-
-
     }
 
+    /**
+     * Traverse a directory structure and delete all the content
+     *
+     * @param folder
+     *      The directory to delete
+     * @return
+     *      {@code true} in the directory was removed, {@code false}  otherwise
+     */
     private boolean deleteFolder( Path folder ) {
 
         def result = true

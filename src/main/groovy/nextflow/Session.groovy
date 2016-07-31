@@ -126,7 +126,7 @@ class Session implements ISession {
 
     private DAG dag
 
-    private Cache cache
+    private CacheDB cache
 
     private Barrier processesBarrier = new Barrier()
 
@@ -201,7 +201,7 @@ class Session implements ISession {
      */
     TaskDispatcher getDispatcher() { dispatcher }
 
-    Cache getCache() { cache }
+    CacheDB getCache() { cache }
 
     /**
      * Creates a new session using the configuration properties provided
@@ -276,7 +276,7 @@ class Session implements ISession {
         this.observers = createObservers()
         this.statsEnabled = observers.size()>0
 
-        cache = new Cache(uniqueId,runName).open()
+        cache = new CacheDB(uniqueId,runName).open()
     }
 
     /**

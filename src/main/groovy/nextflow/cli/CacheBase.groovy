@@ -23,7 +23,7 @@ import java.nio.file.Path
 
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
-import nextflow.Cache
+import nextflow.CacheDB
 import nextflow.exception.AbortOperationException
 import nextflow.util.HistoryFile
 
@@ -71,8 +71,8 @@ trait CacheBase {
 
     }
 
-    Cache cacheFor(Entry entry) {
-        new Cache(entry,basePath)
+    CacheDB cacheFor(Entry entry) {
+        new CacheDB(entry,basePath)
     }
 
     List<Entry> listIds() {

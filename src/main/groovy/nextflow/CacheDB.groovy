@@ -45,7 +45,7 @@ import org.iq80.leveldb.impl.Iq80DBFactory
  */
 @Slf4j
 @CompileStatic
-class Cache implements Closeable {
+class CacheDB implements Closeable {
 
     /** The underlying Level DB instance */
     private DB db
@@ -73,11 +73,11 @@ class Cache implements Closeable {
 
     private final int KEY_SIZE
 
-    Cache(Entry entry, Path home=null) {
+    CacheDB(Entry entry, Path home=null) {
         this(entry.sessionId, entry.runName, home)
     }
 
-    Cache(UUID uniqueId, String runName, Path home=null) {
+    CacheDB(UUID uniqueId, String runName, Path home=null) {
         if( !uniqueId ) throw new AbortOperationException("Missing cache `uuid`")
         if( !runName ) throw new AbortOperationException("Missing cache `runName`")
 
@@ -100,9 +100,9 @@ class Cache implements Closeable {
     /**
      * Initialise the database structure on the underlying file system
      *
-     * @return The {@link Cache} instance itself
+     * @return The {@link CacheDB} instance itself
      */
-    Cache open() {
+    CacheDB open() {
         openDb()
         indexFile.delete()
         indexHandle = new RandomAccessFile(indexFile.toFile(), 'rw')
@@ -112,9 +112,9 @@ class Cache implements Closeable {
     /**
      * Open the database in read mode
      *
-     * @return The {@link Cache} instance itself
+     * @return The {@link CacheDB} instance itself
      */
-    Cache openForRead() {
+    CacheDB openForRead() {
         openDb()
         if( !indexFile.exists() )
             throw new AbortOperationException("Missing cache index file: $indexFile")
@@ -181,7 +181,6 @@ class Cache implements Closeable {
     }
 
 
-
     /**
      * Save task runtime information to th cache DB
      *
@@ -228,7 +227,7 @@ class Cache implements Closeable {
         indexHandle.writeBoolean(cached)
     }
 
-    void dropIndex( ) {
+    void deleteIndex() {
         indexFile.delete()
     }
 
@@ -239,9 +238,9 @@ class Cache implements Closeable {
     /**
      * Iterate the tasks cache using the index file
      * @param closure The operation to applied
-     * @return The {@link Cache} instance itself
+     * @return The {@link CacheDB} instance itself
      */
-    Cache eachRecord( Closure closure ) {
+    CacheDB eachRecord( Closure closure ) {
         assert closure
 
         def key = new byte[KEY_SIZE]
@@ -278,9 +277,6 @@ class Cache implements Closeable {
         return this
     }
 
-    boolean isEmpty() {
-        !db.iterator().hasNext()
-    }
 
     /**
      * Close the underlying database and index file
