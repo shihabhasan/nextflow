@@ -467,15 +467,11 @@ class TaskRun implements Cloneable {
     static final public String CMD_START = '.command.begin'
     static final public String CMD_RUN = '.command.run'
     static final public String CMD_STUB = '.command.run.1'
-    @Deprecated static final public String CMD_CONTEXT = '.command.val'
     static final public String CMD_TRACE = '.command.trace'
 
 
-
     String toString( ) {
-
         "id: $id; name: $name; type: $type; status: $exitStatus; error: $error; workDirectory: $workDir"
-
     }
 
 
