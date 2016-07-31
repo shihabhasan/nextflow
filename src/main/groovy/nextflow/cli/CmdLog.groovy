@@ -48,6 +48,8 @@ class CmdLog extends CmdBase implements CacheBase {
 
     static private List<String> ALL_FIELDS
 
+    static private DEFAULT_FIELDS = TraceRecord.FOLDER
+
     static {
         ALL_FIELDS = []
         ALL_FIELDS.addAll( TraceRecord.FIELDS.keySet() )
@@ -64,7 +66,7 @@ class CmdLog extends CmdBase implements CacheBase {
     String sep = '\t'
 
     @Parameter(names=['-f','-fields'], description = 'Comma separated list of fields to include in the printed log -- Use the `-l` option to show the list of available fields')
-    String fields = 'folder'
+    String fields
 
     @Parameter(names = ['-t','-template'], description = 'Text template used to each record in the log ')
     String templateStr
@@ -93,6 +95,8 @@ class CmdLog extends CmdBase implements CacheBase {
 
     private Template templateScript
 
+    private Map<HashCode,Boolean> printed = new HashMap<>()
+
     @Override
     final String getName() { NAME }
 
@@ -104,21 +108,24 @@ class CmdLog extends CmdBase implements CacheBase {
         // validate input options
         //
         if( fields && templateStr )
-            throw new AbortOperationException("Options `fields` and `template` cannot be used in the same command")
+            throw new AbortOperationException("Options `-f` and `-t` cannot be used in the same command")
 
-//        if( (fields || templateStr) && !args )
-//            throw new AbortOperationException("You need to specify a run name or session id")
-
+        //
+        // when no CLI options have been specified, just show the history log
         showHistory = !args && !before && !after && !but
 
         //
-        // initialise template engine and filters
+        // initialise filter engine
         //
         if( filterStr ) {
             filterScript = new Grengine().create("{ it -> $filterStr }")
         }
 
+        //
+        // initialize the template engine
+        //
         if( !templateStr ) {
+            if( !fields ) fields = DEFAULT_FIELDS
             templateStr = fields.tokenize(',  \n').collect { '$'+it } .join(sep)
         }
         else if( new File(templateStr).exists() ) {
@@ -150,7 +157,7 @@ class CmdLog extends CmdBase implements CacheBase {
         // -- main
         listIds().each { entry ->
 
-            // -- go
+
             cacheFor(entry)
                         .openForRead()
                         .eachRecord(this.&printRecord)
@@ -159,8 +166,6 @@ class CmdLog extends CmdBase implements CacheBase {
         }
 
     }
-
-    private Map<HashCode,Boolean> printed = new HashMap<>()
 
     /**
      * Print a log {@link TraceRecord} the the standard output by using the specified {@link #templateStr}
@@ -173,7 +178,6 @@ class CmdLog extends CmdBase implements CacheBase {
             return
         else
             printed.put(hash,Boolean.TRUE)
-
 
         final adaptor = new TraceAdaptor(record)
 

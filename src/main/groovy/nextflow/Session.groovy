@@ -601,7 +601,7 @@ class Session implements ISession {
         final task = handler.task
         log.info "[${task.hashLog}] ${task.runType.message} > ${task.name}"
         // -- save a record in the cache index
-        cache.putTaskIndex(handler)
+        cache.putIndexAsync(handler)
 
         for( TraceObserver it : observers ) {
             try {
@@ -650,8 +650,7 @@ class Session implements ISession {
 
     void notifyTaskCached( TaskHandler handler ) {
         // -- save a record in the cache index
-        cache.putTaskIndex(handler)
-        cache.incTaskEntry(handler.task.hash)
+        cache.cacheTaskAsync(handler)
 
         for( TraceObserver it : observers ) {
             try {

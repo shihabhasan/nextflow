@@ -47,20 +47,28 @@ import org.iq80.leveldb.impl.Iq80DBFactory
 @CompileStatic
 class Cache implements Closeable {
 
+    /** The underlying Level DB instance */
     private DB db
 
+    /** The session UUID */
     private UUID uniqueId
 
+    /** The unique run name associated to this cache instance */
     private String runName
 
+    /** The base folder against which the cache is located. Default: current working directory  */
     private Path baseDir
 
+    /** The actual path where DB and index file are located */
     private Path dataDir
 
+    /** An agent used to apply asynchronously DB write operations */
     private Agent writer
 
+    /** The path to the index file */
     private Path indexFile
 
+    /** Index file read/write handle */
     private RandomAccessFile indexHandle
 
     private final int KEY_SIZE
@@ -69,7 +77,6 @@ class Cache implements Closeable {
         this(entry.sessionId, entry.runName, home)
     }
 
-    /** Only for test purpose */
     Cache(UUID uniqueId, String runName, Path home=null) {
         if( !uniqueId ) throw new AbortOperationException("Missing cache `uuid`")
         if( !runName ) throw new AbortOperationException("Missing cache `runName`")
@@ -102,6 +109,11 @@ class Cache implements Closeable {
         return this
     }
 
+    /**
+     * Open the database in read mode
+     *
+     * @return The {@link Cache} instance itself
+     */
     Cache openForRead() {
         openDb()
         if( !indexFile.exists() )
@@ -186,19 +198,27 @@ class Cache implements Closeable {
 
         // -- save in the db
         db.put( key, KryoHelper.serialize(record) )
+
     }
 
     void putTaskAsync( TaskHandler handler ) {
         writer.send { putTaskEntry(handler) }
     }
 
-    void putTaskIndex( TaskHandler handler ) {
-        writer.send { indexHandle.write(handler.task.hash.asBytes()) }
+    void cacheTaskAsync( TaskHandler handler ) {
+        writer.send {
+            writeTaskIndex0(handler,true)
+            incTaskEntry(handler.task.hash)
+        }
     }
 
-    void deleteTaskEntry( HashCode hash ) {
-        final key = hash.asBytes()
-        db.delete(key)
+    void putIndexAsync(TaskHandler handler ) {
+        writer.send { writeTaskIndex0(handler) }
+    }
+
+    private void writeTaskIndex0( TaskHandler handler, boolean cached = false ) {
+        indexHandle.write(handler.task.hash.asBytes())
+        indexHandle.writeBoolean(cached)
     }
 
     void dropIndex( ) {
@@ -209,11 +229,17 @@ class Cache implements Closeable {
         dataDir.deleteDir()
     }
 
+    /**
+     * Iterate the tasks cache using the index file
+     * @param closure The operation to applied
+     * @return The {@link Cache} instance itself
+     */
     Cache eachRecord( Closure closure ) {
         assert closure
 
         def key = new byte[KEY_SIZE]
         while( indexHandle.read(key) != -1) {
+            final cached = indexHandle.readBoolean()
 
             final payload = (byte[])db.get(key)
             if( !payload ) {
@@ -223,6 +249,8 @@ class Cache implements Closeable {
 
             final record = (List<byte[]>)KryoHelper.deserialize(payload)
             TraceRecord trace = TraceRecord.deserialize(record[0])
+            trace.setCached(cached)
+
             final refCount = record[2] as Integer
 
             final len=closure.maximumNumberOfParameters

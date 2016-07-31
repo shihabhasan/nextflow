@@ -65,7 +65,7 @@ class CmdClean extends CmdBase implements CacheBase {
 
     private Cache currentCacheDb
 
-    private Map<HashCode, Integer> dryHash = new HashMap<>()
+    private Map<HashCode, Short> dryHash = new HashMap<>()
 
 
     @Override
@@ -125,7 +125,7 @@ class CmdClean extends CmdBase implements CacheBase {
             return true
         }
         else {
-            dryHash.put(hash, refCount)
+            dryHash.put(hash, (short)refCount)
             return false
         }
 

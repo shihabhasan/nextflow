@@ -447,4 +447,11 @@ class TraceRecord implements Serializable {
         new TraceRecord(map)
     }
 
+    TraceRecord setCached(boolean value) {
+        if( value ) {
+            store.status = 'CACHED'
+        }
+        return this
+    }
+
 }

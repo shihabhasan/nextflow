@@ -15,7 +15,7 @@ class CachedTaskHandler extends TaskHandler {
     CachedTaskHandler(TaskRun task, TraceRecord trace) {
         super(task)
         this.trace = trace
-        trace.store.status = 'CACHED'
+        this.trace.setCached(true)
     }
 
     @Override

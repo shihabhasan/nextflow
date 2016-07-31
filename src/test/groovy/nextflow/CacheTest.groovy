@@ -135,15 +135,15 @@ class CacheTest extends Specification {
 
         def h1 = makeTaskHandler(hash1, [task_id: 1, process: 'foo', exit: 0])
         cache.putTaskEntry(h1)
-        cache.putTaskIndex(h1)
+        cache.writeTaskIndex0(h1)
 
         def h2 = makeTaskHandler(hash2, [task_id: 2, process: 'bar', exit: 0])
         cache.putTaskEntry(h2)
-        cache.putTaskIndex(h2)
+        cache.writeTaskIndex0(h2)
 
         def h3 = makeTaskHandler(hash3, [task_id: 3, process: 'baz', exit: 1])
         cache.putTaskEntry(h3)
-        cache.putTaskIndex(h3)
+        cache.writeTaskIndex0(h3)
 
         // done
         cache.close()
