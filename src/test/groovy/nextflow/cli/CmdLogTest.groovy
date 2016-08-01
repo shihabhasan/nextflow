@@ -49,11 +49,12 @@ class CmdLogTest extends Specification {
     def 'should print the folders for executed tasks' () {
 
         setup:
-        def folder = Files.createTempDirectory('test')
-        def uuid = UUID.randomUUID()
+        final folder = Files.createTempDirectory('test')
+        final uuid = UUID.randomUUID()
+        final runName = 'test_1'
 
         // -- the session object
-        def cache = new CacheDB(uuid, folder)
+        def cache = new CacheDB(uuid, runName, folder)
 
         // -- the processor mock
         def proc = Mock(TaskProcessor)
@@ -78,16 +79,24 @@ class CmdLogTest extends Specification {
         task3.getHash() >> { CacheHelper.hasher('x3').hash() }
 
         cache.open()
-        cache.putTaskEntry(new CachedTaskHandler(task1, new TraceRecord([task_id: 1, process: 'foo', exit: 0, folder:"$folder/aaa"])) )
-        cache.putTaskEntry(new CachedTaskHandler(task2, new TraceRecord([task_id: 2, process: 'foo', exit: 1, folder:"$folder/bbb"])) )
-        cache.putTaskEntry(new CachedTaskHandler(task3, new TraceRecord([task_id: 3, process: 'bar', exit: 0, folder:"$folder/ccc"])) )
+        def h1 = new CachedTaskHandler(task1, new TraceRecord([task_id: 1, process: 'foo', exit: 0, folder:"$folder/aaa"]))
+        cache.writeTaskIndex0(h1)
+        cache.writeTaskEntry0(h1)
+
+        def h2 = new CachedTaskHandler(task2, new TraceRecord([task_id: 2, process: 'foo', exit: 1, folder:"$folder/bbb"]))
+        cache.writeTaskIndex0(h2)
+        cache.writeTaskEntry0(h2)
+
+        def h3 = new CachedTaskHandler(task3, new TraceRecord([task_id: 3, process: 'bar', exit: 0, folder:"$folder/ccc"]))
+        cache.writeTaskIndex0(h3)
+        cache.writeTaskEntry0(h3)
         cache.close()
 
         def history = new HistoryFile(folder.resolve(HistoryFile.FILE_NAME))
-        history.write(uuid,'test_1','run')
+        history.write(uuid,runName,'run')
 
         when:
-        def log = new CmdLog(basePath: folder, args: ['test_1'])
+        def log = new CmdLog(basePath: folder, args: [runName])
         log.run()
         def stdout = capture
                 .toString()
@@ -106,11 +115,12 @@ class CmdLogTest extends Specification {
     def 'should filter printed tasks' () {
 
         setup:
-        def folder = Files.createTempDirectory('test')
-        def uuid = UUID.randomUUID()
+        final folder = Files.createTempDirectory('test')
+        final uuid = UUID.randomUUID()
+        final runName = 'test_1'
 
         // -- the session object
-        def cache = new CacheDB(uuid, folder)
+        def cache = new CacheDB(uuid, runName, folder)
 
         // -- the processor mock
         def proc = Mock(TaskProcessor)
@@ -135,13 +145,21 @@ class CmdLogTest extends Specification {
         task3.getHash() >> { CacheHelper.hasher('x3').hash() }
 
         cache.open()
-        cache.putTaskEntry(new CachedTaskHandler(task1, new TraceRecord([task_id: 1, process: 'foo', exit: 0, folder:"$folder/aaa"])) )
-        cache.putTaskEntry(new CachedTaskHandler(task2, new TraceRecord([task_id: 2, process: 'foo', exit: 1, folder:"$folder/bbb"])) )
-        cache.putTaskEntry(new CachedTaskHandler(task3, new TraceRecord([task_id: 3, process: 'bar', exit: 0, folder:"$folder/ccc"])) )
+        def h1 = new CachedTaskHandler(task1, new TraceRecord([task_id: 1, process: 'foo', exit: 0, folder:"$folder/aaa"]))
+        cache.writeTaskIndex0(h1)
+        cache.writeTaskEntry0(h1)
+
+        def h2 = new CachedTaskHandler(task2, new TraceRecord([task_id: 2, process: 'foo', exit: 1, folder:"$folder/bbb"]))
+        cache.writeTaskIndex0(h2)
+        cache.writeTaskEntry0(h2)
+
+        def h3 = new CachedTaskHandler(task3, new TraceRecord([task_id: 3, process: 'bar', exit: 0, folder:"$folder/ccc"]))
+        cache.writeTaskIndex0(h3)
+        cache.writeTaskEntry0(h3)
         cache.close()
 
         def history = new HistoryFile(folder.resolve(HistoryFile.FILE_NAME))
-        history.write(uuid,'test_1','run')
+        history.write(uuid, runName,'run')
 
 
         when:

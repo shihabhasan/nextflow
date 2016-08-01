@@ -24,6 +24,7 @@ import java.nio.file.Paths
 
 import com.google.common.hash.HashCode
 import groovy.transform.CompileStatic
+import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import groovyx.gpars.agent.Agent
 import nextflow.exception.AbortOperationException
@@ -186,7 +187,8 @@ class CacheDB implements Closeable {
      *
      * @param handler A {@link TaskHandler} instance
      */
-    void putTaskEntry( TaskHandler handler ) {
+    @PackageScope
+    void writeTaskEntry0( TaskHandler handler ) {
 
         final task = handler.task
         final proc = task.processor
@@ -208,7 +210,7 @@ class CacheDB implements Closeable {
     }
 
     void putTaskAsync( TaskHandler handler ) {
-        writer.send { putTaskEntry(handler) }
+        writer.send { writeTaskEntry0(handler) }
     }
 
     void cacheTaskAsync( TaskHandler handler ) {
@@ -222,7 +224,8 @@ class CacheDB implements Closeable {
         writer.send { writeTaskIndex0(handler) }
     }
 
-    private void writeTaskIndex0( TaskHandler handler, boolean cached = false ) {
+    @PackageScope
+    void writeTaskIndex0( TaskHandler handler, boolean cached = false ) {
         indexHandle.write(handler.task.hash.asBytes())
         indexHandle.writeBoolean(cached)
     }

@@ -53,6 +53,8 @@ import nextflow.trace.TraceObserver
 import nextflow.util.Barrier
 import nextflow.util.ConfigHelper
 import nextflow.util.Duration
+import nextflow.util.NameGenerator
+
 /**
  * Holds the information on the current execution
  *
@@ -232,7 +234,7 @@ class Session implements ISession {
         log.debug "Session uuid: $uniqueId"
 
         // -- set the run name
-        this.runName = config.runName
+        this.runName = config.runName ?: NameGenerator.next()
         log.debug "Run name: $runName"
 
         // -- normalize taskConfig object
